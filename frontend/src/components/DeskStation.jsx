@@ -67,41 +67,59 @@ function VoxelDesk({ accentColor }) {
   )
 }
 
-// Mesa HQ redonda → convertida a mesa cuadrada grande con sillas bloque
+// Mesa HQ circular con 5 sillas — coincide exactamente con HQ_CHAIR_OFFSETS en OfficeMap
 function VoxelHQDesk() {
+  // Mismas posiciones que HQ_CHAIR_OFFSETS en OfficeMap.jsx
   const chairPositions = [
-    [0, -2.2, 0], [0, 2.2, 0], [-2.2, 0, 0], [2.2, 0, 0]
+    [0,    2.2,  0],
+    [0,   -2.2,  0],
+    [-2.2, 0,    0],
+    [2.2,  0,    0],
+    [0,    1.6, -1.6],
   ]
   return (
     <group>
-      {/* Alfombra roja más grande para HQ */}
+      {/* Alfombra roja grande */}
       <mesh position={[0, 0.02, 0]} rotation={[-Math.PI/2, 0, 0]} receiveShadow>
-        <planeGeometry args={[6, 6]} />
+        <planeGeometry args={[7, 7]} />
         <meshStandardMaterial color="#7f1d1d" roughness={1} />
       </mesh>
-      {/* Mesa central cuadrada grande */}
+      {/* Mesa circular (cilindro voxel - 12 lados) */}
       <mesh position={[0, 0.55, 0]} castShadow receiveShadow>
-        <boxGeometry args={[3.0, 0.2, 3.0]} />
+        <cylinderGeometry args={[1.6, 1.6, 0.18, 12]} />
         <meshStandardMaterial color="#c8a96e" roughness={0.7} metalness={0.1} />
       </mesh>
-      {/* Pata central bloque */}
+      {/* Pata central */}
       <mesh position={[0, 0.25, 0]} castShadow>
-        <boxGeometry args={[0.4, 0.5, 0.4]} />
+        <boxGeometry args={[0.35, 0.5, 0.35]} />
         <meshStandardMaterial color="#a08060" roughness={0.6} />
       </mesh>
-      {/* Sillas bloque */}
-      {chairPositions.map(([cx, cy, cz], i) => (
-        <group key={i} position={[cx, 0, cz]}>
-          <mesh position={[0, 0.44, 0]} castShadow>
-            <boxGeometry args={[0.6, 0.1, 0.6]} />
-            <meshStandardMaterial color="#334155" roughness={0.9} />
-          </mesh>
-          <mesh position={[0, 0.74, cx === 0 ? (cz > 0 ? -0.27 : 0.27) : 0]} castShadow>
-            <boxGeometry args={[0.6, 0.6, 0.1]} />
-            <meshStandardMaterial color="#334155" roughness={0.9} />
-          </mesh>
-        </group>
-      ))}
+      {/* Sillas — una por cada offset */}
+      {chairPositions.map(([cx, _, cz], i) => {
+        // El respaldo mira hacia afuera del centro
+        const angle = Math.atan2(cx, cz)
+        return (
+          <group key={i} position={[cx, 0, cz]} rotation={[0, angle, 0]}>
+            {/* Asiento */}
+            <mesh position={[0, 0.44, 0]} castShadow>
+              <boxGeometry args={[0.6, 0.1, 0.6]} />
+              <meshStandardMaterial color="#334155" roughness={0.9} />
+            </mesh>
+            {/* Respaldo (detrás del asiento, mirando afuera) */}
+            <mesh position={[0, 0.74, 0.3]} castShadow>
+              <boxGeometry args={[0.58, 0.58, 0.1]} />
+              <meshStandardMaterial color="#334155" roughness={0.9} />
+            </mesh>
+            {/* Patas silla */}
+            {[[-0.22, -0.2], [0.22, -0.2], [-0.22, 0.2], [0.22, 0.2]].map(([px, pz], j) => (
+              <mesh key={j} position={[px, 0.2, pz]} castShadow>
+                <boxGeometry args={[0.07, 0.42, 0.07]} />
+                <meshStandardMaterial color="#475569" roughness={0.8} />
+              </mesh>
+            ))}
+          </group>
+        )
+      })}
     </group>
   )
 }
@@ -111,10 +129,10 @@ function VoxelDevDesk({ accentColor }) {
   return (
     <group>
       <VoxelDesk accentColor={accentColor} />
-      {/* Server rack - bloque alto */}
+      {/* Server rack - gris claro visible sobre piso oscuro */}
       <mesh position={[-1.9, 0.9, 0]} castShadow receiveShadow>
         <boxGeometry args={[0.55, 1.8, 0.7]} />
-        <meshStandardMaterial color="#0f172a" roughness={0.2} metalness={0.8} />
+        <meshStandardMaterial color="#94a3b8" roughness={0.3} metalness={0.5} />
       </mesh>
       {/* Luces rack - bloques pequeños */}
       {[0.5, 0.2, -0.1, -0.4, -0.7].map((y, i) => (
