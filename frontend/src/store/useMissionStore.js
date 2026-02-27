@@ -4,7 +4,7 @@ import { io } from 'socket.io-client';
 const host = window.location.hostname;
 const socketUrl = `http://${host}:3000`;
 const socket = io(socketUrl, {
-  autoConnect: false,
+  autoConnect: true,
 });
 
 export const useMissionStore = create((set) => {
