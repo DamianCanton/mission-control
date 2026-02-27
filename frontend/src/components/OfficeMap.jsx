@@ -4,6 +4,7 @@ import { Html, OrthographicCamera, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useMissionStore } from '../store/useMissionStore';
 import { DeskStation } from './DeskStation';
+import { EffectComposer, Bloom } from '@react-three/postprocessing';
 
 const STATION_COORDS = {
   hq:        [0,   0,  0],
@@ -65,32 +66,47 @@ function AgentMesh({ agent }) {
       {/* Cuerpo - cilindro */}
       <mesh position={[0, 0.7, 0]} castShadow>
         <cylinderGeometry args={[0.22, 0.28, 0.7, 6]} />
-        <meshStandardMaterial color={color} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.5} />
       </mesh>
       {/* Cabeza - esfera */}
       <mesh position={[0, 1.25, 0]} castShadow>
         <sphereGeometry args={[0.25, 8, 6]} />
-        <meshStandardMaterial color={color} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.8} />
       </mesh>
       {/* Ojos */}
       <mesh position={[-0.09, 1.28, 0.22]}>
         <sphereGeometry args={[0.05, 5, 4]} />
-        <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={1} />
+        <meshStandardMaterial color="#00ffff" emissive="#00ffff" emissiveIntensity={3} />
       </mesh>
       <mesh position={[0.09, 1.28, 0.22]}>
         <sphereGeometry args={[0.05, 5, 4]} />
-        <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={1} />
+        <meshStandardMaterial color="#00ffff" emissive="#00ffff" emissiveIntensity={3} />
       </mesh>
       {/* Halo si está "thinking" */}
       {agent.status === 'thinking' && (
         <mesh position={[0, 1.65, 0]} rotation={[Math.PI/2, 0, 0]}>
           <torusGeometry args={[0.3, 0.04, 8, 20]} />
-          <meshStandardMaterial color="#fde68a" emissive="#fde68a" emissiveIntensity={1} />
+          <meshStandardMaterial color="#fde68a" emissive="#fde68a" emissiveIntensity={4} />
         </mesh>
       )}
       {/* Nombre flotante */}
-      <Html position={[0, 1.9, 0]} center style={{ fontSize: '10px', color: '#1f2937', background: 'rgba(255,255,255,0.85)', padding: '1px 5px', borderRadius: '4px', whiteSpace: 'nowrap', pointerEvents: 'none' }}>
-        {agent.agentName}
+      <Html position={[0, 2.1, 0]} center style={{ pointerEvents: 'none' }}>
+        <div style={{
+          background: 'rgba(0, 0, 0, 0.6)',
+          backdropFilter: 'blur(6px)',
+          border: `1px solid ${color}66`,
+          color: color,
+          fontSize: '10px',
+          padding: '2px 8px',
+          borderRadius: '6px',
+          whiteSpace: 'nowrap',
+          boxShadow: `0 0 10px ${color}44`,
+          fontFamily: 'monospace',
+          fontWeight: 'bold',
+          letterSpacing: '0.03em',
+        }}>
+          {agent.agentName}
+        </div>
       </Html>
     </group>
   )
@@ -100,16 +116,17 @@ export default function OfficeMap() {
   const { agents } = useMissionStore();
 
   return (
-    <div style={{ width: '100%', height: '500px', background: '#111827', borderRadius: '0.5rem', overflow: 'hidden' }}>
+    <div style={{ width: '100%', height: '500px', background: '#080d14', borderRadius: '0.5rem', overflow: 'hidden' }}>
       <Canvas shadows>
-        <color attach="background" args={['#111827']} />
+        <color attach="background" args={['#080d14']} />
+        <fog attach="fog" args={['#0a0f1a', 20, 60]} />
         <OrthographicCamera makeDefault position={[20, 20, 20]} zoom={40} />
         <ambientLight intensity={0.6} color="#fff8e7" />
         <directionalLight position={[10, 15, 10]} intensity={1.2} castShadow shadow-mapSize={[2048,2048]} color="#fffacd" />
         <directionalLight position={[-5, 8, -10]} intensity={0.4} color="#c8e6ff" />
         
         {/* Piso */}
-        <gridHelper args={[30, 30, '#4b5563', '#374151']} position={[0, 0, 0]} />
+        <gridHelper args={[30, 30, '#1e3a5f', '#0f2035']} position={[0, 0, 0]} />
         
         {/* Estaciones */}
         {Object.entries(STATION_COORDS).map(([id, pos]) => (
@@ -122,6 +139,15 @@ export default function OfficeMap() {
         ))}
         
         <OrbitControls enableRotate={false} enableZoom={false} enablePan={false} />
+
+        <EffectComposer>
+          <Bloom 
+            intensity={0.8}
+            luminanceThreshold={0.2}
+            luminanceSmoothing={0.9}
+            mipmapBlur
+          />
+        </EffectComposer>
       </Canvas>
     </div>
   );
