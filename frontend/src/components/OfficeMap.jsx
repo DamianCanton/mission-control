@@ -43,13 +43,12 @@ function getStationIdForAction(action = '') {
 }
 
 // Posiciones de sillas alrededor de la mesa HQ (5 sillas)
-const HQ_CHAIR_OFFSETS = [
-  [0,    2.2,  0],   // frente
-  [0,   -2.2,  0],   // atrás
-  [-2.2, 0,    0],   // izquierda
-  [2.2,  0,    0],   // derecha
-  [0,    1.6, -1.6], // diagonal
-]
+// 8 sillas distribuidas en círculo radio 2.0 alrededor del centro del HQ
+const HQ_SLOTS = Array.from({ length: 8 }, (_, i) => {
+  const angle = (i / 8) * Math.PI * 2
+  return [Math.sin(angle) * 2.0, 0, Math.cos(angle) * 2.0]
+})
+
 
 function AgentMesh({ agent, seatIndex }) {
   const groupRef = useRef()
@@ -59,8 +58,8 @@ function AgentMesh({ agent, seatIndex }) {
   // Si está en HQ y tiene índice de silla, usar offset de silla
   let targetCoords = [...base]
   if (stationId === 'hq' && seatIndex !== undefined) {
-    const offset = HQ_CHAIR_OFFSETS[seatIndex % HQ_CHAIR_OFFSETS.length]
-    targetCoords = [base[0] + offset[0], base[1], base[2] + offset[2]]
+    const slot = HQ_SLOTS[seatIndex % 8]
+    targetCoords = [base[0] + slot[0], base[1], base[2] + slot[2]]
   }
 
   const COLOR_MAP = {
@@ -77,7 +76,8 @@ function AgentMesh({ agent, seatIndex }) {
 
   useFrame((_, delta) => {
     if (!groupRef.current) return
-    const target = new THREE.Vector3(targetCoords[0], 0, targetCoords[2])
+    const targetY = stationId === 'hq' ? -0.25 : 0  // sentado vs parado
+    const target = new THREE.Vector3(targetCoords[0], targetY, targetCoords[2])
     groupRef.current.position.lerp(target, delta * 2)
   })
 
