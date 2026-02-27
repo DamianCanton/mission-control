@@ -1,5 +1,6 @@
 import React from 'react';
 import { useMissionStore } from '../store/useMissionStore';
+import OfficeMap from './OfficeMap';
 
 const Dashboard = () => {
   const logs = useMissionStore(state => state.logs);
@@ -19,6 +20,8 @@ const Dashboard = () => {
   return (
     <div className="space-y-6">
       <h2 className="text-3xl font-bold text-white mb-8">System Overview</h2>
+      
+      <OfficeMap />
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Total Logs */}
