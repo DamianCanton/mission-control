@@ -117,11 +117,9 @@ function AgentMesh({ agent }) {
 }
 
 export default function OfficeMap() {
-  const { agents, statusFilter, setStatusFilter } = useMissionStore(state => ({
-    agents: state.agents,
-    statusFilter: state.statusFilter,
-    setStatusFilter: state.setStatusFilter,
-  }))
+  const agents = useMissionStore(state => state.agents)
+  const statusFilter = useMissionStore(state => state.statusFilter)
+  const setStatusFilter = useMissionStore(state => state.setStatusFilter)
 
   const FILTERS = [
     { key: 'all',       label: '⬡ All',       color: 'bg-gray-600' },
