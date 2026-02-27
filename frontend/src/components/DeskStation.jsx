@@ -16,6 +16,11 @@ const STATION_META = {
 function GenericDesk({ accentColor }) {
   return (
     <group>
+      {/* Alfombra */}
+      <mesh position={[0, 0.02, 0]} rotation={[-Math.PI/2, 0, 0]} receiveShadow>
+        <planeGeometry args={[3.5, 2.8]} />
+        <meshStandardMaterial color="#d1d5db" roughness={1} />
+      </mesh>
       {/* Superficie de mesa */}
       <mesh position={[0, 0.45, 0]} castShadow receiveShadow>
         <boxGeometry args={[2.4, 0.08, 1.5]} />
@@ -43,6 +48,21 @@ function GenericDesk({ accentColor }) {
         <boxGeometry args={[0.18, 0.08, 0.18]} />
         <meshStandardMaterial color="#374151" roughness={0.4} metalness={0.5} />
       </mesh>
+      {/* Teclado */}
+      <mesh position={[0, 0.5, 0.2]} castShadow>
+        <boxGeometry args={[0.9, 0.025, 0.35]} />
+        <meshStandardMaterial color="#1f2937" roughness={0.6} metalness={0.2} />
+      </mesh>
+      {/* Maceta */}
+      <mesh position={[-0.9, 0.55, 0.2]} castShadow>
+        <cylinderGeometry args={[0.08, 0.06, 0.15, 6]} />
+        <meshStandardMaterial color="#15803d" roughness={0.9} />
+      </mesh>
+      {/* Tallo */}
+      <mesh position={[-0.9, 0.7, 0.2]}>
+        <sphereGeometry args={[0.1, 5, 4]} />
+        <meshStandardMaterial color="#16a34a" roughness={1} />
+      </mesh>
       {/* Archivador lateral */}
       <mesh position={[1.4, 0.4, 0]} castShadow receiveShadow>
         <boxGeometry args={[0.4, 0.8, 0.6]} />
@@ -57,6 +77,11 @@ function HQDesk() {
   const chairAngles = [0, 72, 144, 216, 288].map(d => d * Math.PI / 180)
   return (
     <group>
+      {/* Alfombra */}
+      <mesh position={[0, 0.02, 0]} rotation={[-Math.PI/2, 0, 0]} receiveShadow>
+        <planeGeometry args={[3.5, 2.8]} />
+        <meshStandardMaterial color="#d1d5db" roughness={1} />
+      </mesh>
       {/* Mesa redonda */}
       <mesh position={[0, 0.45, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[1.4, 1.4, 0.08, 12]} />
@@ -121,7 +146,7 @@ export function DeskStation({ id, position }) {
   return (
     <group position={[x, y, z]}>
       {id === 'hq' ? <HQDesk /> : id === 'dev' ? <DevDesk accentColor={meta.accent} /> : <GenericDesk accentColor={meta.accent} />}
-      <Html center position={[0, 2.0, 0]} style={{ pointerEvents: 'none' }}>
+      <Html center position={[0, -0.3, 1.8]} style={{ pointerEvents: 'none' }}>
         <div style={{
           background: 'rgba(255, 252, 248, 0.75)',
           backdropFilter: 'blur(6px)',

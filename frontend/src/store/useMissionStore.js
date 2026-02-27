@@ -36,8 +36,10 @@ export const useMissionStore = create((set) => {
     logs: [],
     agents: [],
     connected: false,
+    statusFilter: 'all',
     
     // Acciones para uso manual si fuera necesario (aunque principalmente se alimentará por WebSockets)
+    setStatusFilter: (filter) => set({ statusFilter: filter }),
     addLog: (log) => set((state) => {
       const newLogs = [...state.logs, log];
       if (newLogs.length > 500) {

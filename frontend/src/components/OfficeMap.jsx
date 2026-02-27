@@ -55,6 +55,10 @@ function AgentMesh({ agent }) {
   }
   const color = COLOR_MAP[agent.status] || '#7c3aed'
 
+  const statusFilter = useMissionStore(state => state.statusFilter)
+  const isGhost = statusFilter !== 'all' && agent.status !== statusFilter
+  const opacity = isGhost ? 0.12 : 1
+
   useFrame((_, delta) => {
     if (!groupRef.current) return
     const target = new THREE.Vector3(targetCoords[0], 0, targetCoords[2])
@@ -66,58 +70,103 @@ function AgentMesh({ agent }) {
       {/* Cuerpo cilindro */}
       <mesh position={[0, 0.65, 0]} castShadow>
         <cylinderGeometry args={[0.2, 0.25, 0.7, 7]} />
-        <meshStandardMaterial color={color} roughness={0.6} metalness={0.1} />
+        <meshStandardMaterial color={color} roughness={0.6} metalness={0.1} transparent={isGhost} opacity={opacity} />
       </mesh>
       {/* Cabeza esfera */}
       <mesh position={[0, 1.2, 0]} castShadow>
         <sphereGeometry args={[0.22, 8, 7]} />
-        <meshStandardMaterial color="#e2d9ce" roughness={0.8} metalness={0} />
+        <meshStandardMaterial color="#e2d9ce" roughness={0.8} metalness={0} transparent={isGhost} opacity={opacity} />
       </mesh>
       {/* Ojos */}
       <mesh position={[-0.08, 1.23, 0.19]}>
         <sphereGeometry args={[0.04, 5, 4]} />
-        <meshStandardMaterial color={color} roughness={0.3} />
+        <meshStandardMaterial color={color} roughness={0.3} transparent={isGhost} opacity={opacity} />
       </mesh>
       <mesh position={[0.08, 1.23, 0.19]}>
         <sphereGeometry args={[0.04, 5, 4]} />
-        <meshStandardMaterial color={color} roughness={0.3} />
+        <meshStandardMaterial color={color} roughness={0.3} transparent={isGhost} opacity={opacity} />
       </mesh>
       {/* Halo si thinking */}
       {agent.status === 'thinking' && (
         <mesh position={[0, 1.55, 0]} rotation={[Math.PI / 2, 0, 0]}>
           <torusGeometry args={[0.28, 0.03, 8, 20]} />
-          <meshStandardMaterial color="#fbbf24" roughness={0.4} />
+          <meshStandardMaterial color="#fbbf24" roughness={0.4} transparent={isGhost} opacity={opacity} />
         </mesh>
       )}
       {/* Label */}
-      <Html position={[0, 1.9, 0]} center style={{ pointerEvents: 'none' }}>
-        <div style={{
-          background: 'rgba(255, 252, 248, 0.8)',
-          backdropFilter: 'blur(4px)',
-          border: `1px solid ${color}55`,
-          color: '#111',
-          fontSize: '10px',
-          padding: '2px 8px',
-          borderRadius: '12px',
-          whiteSpace: 'nowrap',
-          boxShadow: '0 1px 6px rgba(0,0,0,0.2)',
-          fontWeight: '600',
-        }}>
-          {agent.agentName}
-        </div>
-      </Html>
+      {!isGhost && (
+        <Html position={[0, 2.5, 0]} center style={{ pointerEvents: 'none' }}>
+          <div style={{
+            background: 'rgba(255, 252, 248, 0.8)',
+            backdropFilter: 'blur(4px)',
+            border: `1px solid ${color}55`,
+            color: '#111',
+            fontSize: '10px',
+            padding: '2px 8px',
+            borderRadius: '12px',
+            whiteSpace: 'nowrap',
+            boxShadow: '0 1px 6px rgba(0,0,0,0.2)',
+            fontWeight: '600',
+          }}>
+            {agent.agentName}
+          </div>
+        </Html>
+      )}
     </group>
   )
 }
 
 export default function OfficeMap() {
-  const { agents } = useMissionStore();
+  const { agents, statusFilter, setStatusFilter } = useMissionStore(state => ({
+    agents: state.agents,
+    statusFilter: state.statusFilter,
+    setStatusFilter: state.setStatusFilter,
+  }))
+
+  const FILTERS = [
+    { key: 'all',       label: '⬡ All',       color: 'bg-gray-600' },
+    { key: 'running',   label: '▶ Running',   color: 'bg-blue-600' },
+    { key: 'thinking',  label: '◌ Thinking',  color: 'bg-yellow-500' },
+    { key: 'completed', label: '✓ Completed', color: 'bg-green-600' },
+    { key: 'error',     label: '✕ Error',     color: 'bg-red-600' },
+    { key: 'idle',      label: '— Idle',      color: 'bg-gray-500' },
+  ]
 
   return (
-    <div style={{ width: '100%', height: 'calc(100vh - 120px)', background: '#f0ede8', borderRadius: '0.5rem', overflow: 'hidden' }}>
-      <Canvas shadows gl={{ antialias: true }}>
-        <color attach="background" args={['#f0ede8']} />
-        <OrthographicCamera makeDefault position={[15, 18, 15]} zoom={55} />
+    <div style={{ position: 'relative', width: '100%', height: 'calc(100vh - 120px)' }}>
+      <div style={{
+        position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
+        zIndex: 10, display: 'flex', gap: 8,
+      }}>
+        {FILTERS.map(f => (
+          <button
+            key={f.key}
+            onClick={() => setStatusFilter(f.key)}
+            style={{
+              padding: '4px 14px',
+              borderRadius: 20,
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: 'monospace',
+              border: statusFilter === f.key ? '2px solid white' : '2px solid transparent',
+              cursor: 'pointer',
+              opacity: statusFilter === f.key ? 1 : 0.6,
+              background: statusFilter === f.key
+                ? { all:'#4b5563',running:'#2563eb',thinking:'#d97706',completed:'#16a34a',error:'#dc2626',idle:'#6b7280' }[f.key]
+                : 'rgba(30,30,40,0.7)',
+              color: 'white',
+              backdropFilter: 'blur(4px)',
+              transition: 'all 0.15s',
+            }}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+      <div style={{ width: '100%', height: '100%', background: '#f0ede8', borderRadius: '0.5rem', overflow: 'hidden' }}>
+        <Canvas shadows gl={{ antialias: true }}>
+          <color attach="background" args={['#f0ede8']} />
+          <OrthographicCamera makeDefault position={[15, 18, 15]} zoom={55} />
         
         <ambientLight intensity={0.45} color="#fff8f0" />
         <directionalLight
@@ -164,7 +213,8 @@ export default function OfficeMap() {
         ))}
         
         <OrbitControls enableRotate={false} enableZoom={false} enablePan={false} />
-      </Canvas>
+        </Canvas>
+      </div>
     </div>
   );
 }
