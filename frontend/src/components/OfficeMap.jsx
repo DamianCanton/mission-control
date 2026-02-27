@@ -3,6 +3,7 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { Html, OrthographicCamera, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useMissionStore } from '../store/useMissionStore';
+import { DeskStation } from './DeskStation';
 
 const STATION_COORDS = {
   hq:        [0,   0,  0],
@@ -41,56 +42,58 @@ function getStationIdForAction(action = '') {
   return 'misc'
 }
 
-function StationMesh({ id, position }) {
-  return (
-    <group position={position}>
-      <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[3, 3]} />
-        <meshStandardMaterial color="#374151" />
-      </mesh>
-      <Html position={[0, 0.1, 0]} center>
-        <div style={{ color: '#d1d5db', fontSize: '14px', fontWeight: 'bold', pointerEvents: 'none', whiteSpace: 'nowrap', userSelect: 'none' }}>
-          {STATION_LABELS[id]}
-        </div>
-      </Html>
-    </group>
-  );
-}
-
 function AgentMesh({ agent }) {
-  const meshRef = useRef();
-  
-  const targetId = getStationIdForAction(agent.action);
-  const targetPos = STATION_COORDS[targetId] || STATION_COORDS.misc;
-  
-  // Posición inicial (si es necesario) pero la interpolaremos
-  const targetVector = new THREE.Vector3(targetPos[0], 0.6, targetPos[2]);
+  const meshRef = useRef()
+  const targetPos = STATION_COORDS[getStationIdForAction(agent.action)] || STATION_COORDS.hq
 
-  useFrame((state, delta) => {
-    if (meshRef.current) {
-      meshRef.current.position.lerp(targetVector, delta * 3);
-    }
-  });
+  const COLOR_MAP = {
+    running:   '#3b82f6',
+    thinking:  '#eab308',
+    completed: '#22c55e',
+    error:     '#ef4444',
+  }
+  const color = COLOR_MAP[agent.status] || '#8b5cf6'
 
-  let color = '#8b5cf6'; // default
-  if (agent.status === 'running') color = '#3b82f6';
-  else if (agent.status === 'thinking') color = '#eab308';
-  else if (agent.status === 'completed') color = '#22c55e';
-  else if (agent.status === 'error') color = '#ef4444';
+  useFrame((_, delta) => {
+    if (!meshRef.current) return
+    const target = new THREE.Vector3(...targetPos).add(new THREE.Vector3(0, 0, 0))
+    meshRef.current.position.lerp(target, delta * 2)
+  })
 
   return (
-    <group ref={meshRef} position={[targetPos[0], 0.6, targetPos[2]]}>
-      <mesh castShadow receiveShadow>
-        <boxGeometry args={[0.8, 1.2, 0.8]} />
+    <group ref={meshRef} position={[...targetPos]}>
+      {/* Cuerpo - cilindro */}
+      <mesh position={[0, 0.7, 0]} castShadow>
+        <cylinderGeometry args={[0.22, 0.28, 0.7, 6]} />
         <meshStandardMaterial color={color} />
       </mesh>
-      <Html position={[0, 0.8, 0]} center>
-        <div style={{ background: 'rgba(0,0,0,0.7)', color: 'white', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', whiteSpace: 'nowrap', pointerEvents: 'none', userSelect: 'none' }}>
-          {agent.agentName}
-        </div>
+      {/* Cabeza - esfera */}
+      <mesh position={[0, 1.25, 0]} castShadow>
+        <sphereGeometry args={[0.25, 8, 6]} />
+        <meshStandardMaterial color={color} />
+      </mesh>
+      {/* Ojos */}
+      <mesh position={[-0.09, 1.28, 0.22]}>
+        <sphereGeometry args={[0.05, 5, 4]} />
+        <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={1} />
+      </mesh>
+      <mesh position={[0.09, 1.28, 0.22]}>
+        <sphereGeometry args={[0.05, 5, 4]} />
+        <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={1} />
+      </mesh>
+      {/* Halo si está "thinking" */}
+      {agent.status === 'thinking' && (
+        <mesh position={[0, 1.65, 0]} rotation={[Math.PI/2, 0, 0]}>
+          <torusGeometry args={[0.3, 0.04, 8, 20]} />
+          <meshStandardMaterial color="#fde68a" emissive="#fde68a" emissiveIntensity={1} />
+        </mesh>
+      )}
+      {/* Nombre flotante */}
+      <Html position={[0, 1.9, 0]} center style={{ fontSize: '10px', color: '#1f2937', background: 'rgba(255,255,255,0.85)', padding: '1px 5px', borderRadius: '4px', whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+        {agent.agentName}
       </Html>
     </group>
-  );
+  )
 }
 
 export default function OfficeMap() {
@@ -99,19 +102,21 @@ export default function OfficeMap() {
   return (
     <div style={{ width: '100%', height: '500px', background: '#111827', borderRadius: '0.5rem', overflow: 'hidden' }}>
       <Canvas shadows>
+        <color attach="background" args={['#d4e9f7']} />
         <OrthographicCamera makeDefault position={[20, 20, 20]} zoom={40} />
-        <ambientLight intensity={0.5} />
-        <directionalLight position={[10, 10, 5]} intensity={1} castShadow />
+        <ambientLight intensity={0.6} color="#fff8e7" />
+        <directionalLight position={[10, 15, 10]} intensity={1.2} castShadow shadow-mapSize={[2048,2048]} color="#fffacd" />
+        <directionalLight position={[-5, 8, -10]} intensity={0.4} color="#c8e6ff" />
         
         {/* Piso */}
-        <mesh position={[0, 0, 0]} rotation={[-Math.PI/2, 0, 0]} receiveShadow>
-          <planeGeometry args={[30, 30]} />
-          <meshStandardMaterial color="#1f2937" />
+        <mesh position={[0, -0.01, 0]} rotation={[-Math.PI/2, 0, 0]} receiveShadow>
+          <planeGeometry args={[40, 40]} />
+          <meshStandardMaterial color="#c8b99a" />
         </mesh>
         
-        {/* Estaciones: un plano elevado + texto por cada una */}
+        {/* Estaciones */}
         {Object.entries(STATION_COORDS).map(([id, pos]) => (
-          <StationMesh key={id} id={id} position={pos} />
+          <DeskStation key={id} id={id} position={pos} />
         ))}
         
         {/* Agentes */}
