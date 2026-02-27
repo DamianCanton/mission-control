@@ -6,10 +6,10 @@ const STATION_META = {
   search:    { label: '🔍 Search',  accent: '#10b981' },
   files:     { label: '📁 Files',   accent: '#f59e0b' },
   memory:    { label: '🧠 Memory',  accent: '#8b5cf6' },
-  comms:     { label: '💬 Comms',   accent: '#06b6d4' },
+  comms:     { label: '📨 Messages', accent: '#06b6d4' },
   browser:   { label: '🌐 Browser', accent: '#3b82f6' },
   subagents: { label: '🤖 Agents',  accent: '#ec4899' },
-  misc:      { label: '🔧 Misc',    accent: '#6b7280' },
+  misc:      { label: '🔮 Wildcard', accent: '#a855f7' },
 }
 
 // Mesa voxel genérica

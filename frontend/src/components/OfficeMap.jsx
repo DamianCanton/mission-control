@@ -42,10 +42,26 @@ function getStationIdForAction(action = '') {
   return 'misc'
 }
 
-function AgentMesh({ agent }) {
+// Posiciones de sillas alrededor de la mesa HQ (5 sillas)
+const HQ_CHAIR_OFFSETS = [
+  [0,    2.2,  0],   // frente
+  [0,   -2.2,  0],   // atrás
+  [-2.2, 0,    0],   // izquierda
+  [2.2,  0,    0],   // derecha
+  [0,    1.6, -1.6], // diagonal
+]
+
+function AgentMesh({ agent, seatIndex }) {
   const groupRef = useRef()
   const stationId = getStationIdForAction(agent.action)
-  const targetCoords = STATION_COORDS[stationId] || STATION_COORDS.hq
+  const base = STATION_COORDS[stationId] || STATION_COORDS.hq
+
+  // Si está en HQ y tiene índice de silla, usar offset de silla
+  let targetCoords = [...base]
+  if (stationId === 'hq' && seatIndex !== undefined) {
+    const offset = HQ_CHAIR_OFFSETS[seatIndex % HQ_CHAIR_OFFSETS.length]
+    targetCoords = [base[0] + offset[0], base[1], base[2] + offset[2]]
+  }
 
   const COLOR_MAP = {
     running:   '#3b82f6',
@@ -67,46 +83,68 @@ function AgentMesh({ agent }) {
 
   return (
     <group ref={groupRef} position={[targetCoords[0], 0, targetCoords[2]]}>
-      {/* Cuerpo cilindro */}
-      <mesh position={[0, 0.65, 0]} castShadow>
-        <cylinderGeometry args={[0.2, 0.25, 0.7, 7]} />
-        <meshStandardMaterial color={color} roughness={0.6} metalness={0.1} transparent={isGhost} opacity={opacity} />
-      </mesh>
-      {/* Cabeza esfera */}
-      <mesh position={[0, 1.2, 0]} castShadow>
-        <sphereGeometry args={[0.22, 8, 7]} />
-        <meshStandardMaterial color="#e2d9ce" roughness={0.8} metalness={0} transparent={isGhost} opacity={opacity} />
+      {/* Cabeza - cubo */}
+      <mesh position={[0, 1.4, 0]} castShadow>
+        <boxGeometry args={[0.6, 0.6, 0.6]} />
+        <meshStandardMaterial color="#e2d9ce" roughness={0.9} metalness={0} transparent={isGhost} opacity={opacity} />
       </mesh>
       {/* Ojos */}
-      <mesh position={[-0.08, 1.23, 0.19]}>
-        <sphereGeometry args={[0.04, 5, 4]} />
-        <meshStandardMaterial color={color} roughness={0.3} transparent={isGhost} opacity={opacity} />
+      <mesh position={[-0.13, 1.45, 0.31]}>
+        <boxGeometry args={[0.12, 0.1, 0.02]} />
+        <meshStandardMaterial color="#1e293b" transparent={isGhost} opacity={opacity} />
       </mesh>
-      <mesh position={[0.08, 1.23, 0.19]}>
-        <sphereGeometry args={[0.04, 5, 4]} />
-        <meshStandardMaterial color={color} roughness={0.3} transparent={isGhost} opacity={opacity} />
+      <mesh position={[0.13, 1.45, 0.31]}>
+        <boxGeometry args={[0.12, 0.1, 0.02]} />
+        <meshStandardMaterial color="#1e293b" transparent={isGhost} opacity={opacity} />
       </mesh>
-      {/* Halo si thinking */}
-      {agent.status === 'thinking' && (
-        <mesh position={[0, 1.55, 0]} rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[0.28, 0.03, 8, 20]} />
-          <meshStandardMaterial color="#fbbf24" roughness={0.4} transparent={isGhost} opacity={opacity} />
+      {/* Cuerpo */}
+      <mesh position={[0, 0.7, 0]} castShadow>
+        <boxGeometry args={[0.7, 0.8, 0.4]} />
+        <meshStandardMaterial color={color} roughness={0.8} metalness={0.1} transparent={isGhost} opacity={opacity} />
+      </mesh>
+      {/* Brazo izquierdo */}
+      <mesh position={[-0.5, 0.75, 0]} castShadow>
+        <boxGeometry args={[0.25, 0.7, 0.35]} />
+        <meshStandardMaterial color={color} roughness={0.8} metalness={0.1} transparent={isGhost} opacity={opacity} />
+      </mesh>
+      {/* Brazo derecho */}
+      <mesh position={[0.5, 0.75, 0]} castShadow>
+        <boxGeometry args={[0.25, 0.7, 0.35]} />
+        <meshStandardMaterial color={color} roughness={0.8} metalness={0.1} transparent={isGhost} opacity={opacity} />
+      </mesh>
+      {/* Pierna izquierda */}
+      <mesh position={[-0.2, 0.18, 0]} castShadow>
+        <boxGeometry args={[0.28, 0.4, 0.35]} />
+        <meshStandardMaterial color="#334155" roughness={0.9} transparent={isGhost} opacity={opacity} />
+      </mesh>
+      {/* Pierna derecha */}
+      <mesh position={[0.2, 0.18, 0]} castShadow>
+        <boxGeometry args={[0.28, 0.4, 0.35]} />
+        <meshStandardMaterial color="#334155" roughness={0.9} transparent={isGhost} opacity={opacity} />
+      </mesh>
+      {/* Halo thinking */}
+      {agent.status === 'thinking' && !isGhost && (
+        <mesh position={[0, 1.9, 0]}>
+          <boxGeometry args={[0.8, 0.08, 0.8]} />
+          <meshStandardMaterial color="#fbbf24" roughness={0.4} />
         </mesh>
       )}
       {/* Label */}
       {!isGhost && (
         <Html position={[0, 2.5, 0]} center style={{ pointerEvents: 'none' }}>
           <div style={{
-            background: 'rgba(255, 252, 248, 0.8)',
+            background: 'rgba(15, 23, 42, 0.85)',
             backdropFilter: 'blur(4px)',
-            border: `1px solid ${color}55`,
-            color: '#111',
+            border: `1px solid ${color}88`,
+            color: color,
             fontSize: '10px',
             padding: '2px 8px',
-            borderRadius: '12px',
+            borderRadius: '4px',
             whiteSpace: 'nowrap',
-            boxShadow: '0 1px 6px rgba(0,0,0,0.2)',
-            fontWeight: '600',
+            boxShadow: `0 0 8px ${color}44`,
+            fontWeight: '700',
+            fontFamily: 'monospace',
+            letterSpacing: '0.05em',
           }}>
             {agent.agentName}
           </div>
@@ -161,16 +199,16 @@ export default function OfficeMap() {
           </button>
         ))}
       </div>
-      <div style={{ width: '100%', height: '100%', background: '#f0ede8', borderRadius: '0.5rem', overflow: 'hidden' }}>
+      <div style={{ width: '100%', height: '100%', background: '#020617', borderRadius: '0.5rem', overflow: 'hidden' }}>
         <Canvas shadows gl={{ antialias: true }}>
-          <color attach="background" args={['#f0ede8']} />
+          <color attach="background" args={['#020617']} />
           <OrthographicCamera makeDefault position={[15, 18, 15]} zoom={55} />
         
-        <ambientLight intensity={0.45} color="#fff8f0" />
+        <ambientLight intensity={0.5} color="#ffffff" />
         <directionalLight
           position={[10, 15, 10]}
           intensity={1.3}
-          color="#fffaf0"
+          color="#ffffff"
           castShadow
           shadow-mapSize-width={2048}
           shadow-mapSize-height={2048}
@@ -180,24 +218,24 @@ export default function OfficeMap() {
           shadow-camera-top={20}
           shadow-camera-bottom={-20}
         />
-        <directionalLight position={[-8, 6, -8]} intensity={0.3} color="#ddeeff" />
+        <directionalLight position={[-8, 6, -8]} intensity={0.3} color="#ffffff" />
         
-        {/* Piso nuevo */}
+        {/* Piso negro */}
         <mesh rotation={[-Math.PI/2, 0, 0]} receiveShadow position={[0, 0, 0]}>
           <planeGeometry args={[35, 35]} />
-          <meshStandardMaterial color="#d9d0c0" roughness={0.9} metalness={0} />
+          <meshStandardMaterial color="#0f172a" roughness={0.9} metalness={0} />
         </mesh>
 
-        {/* Pared trasera izq */}
+        {/* Pared izquierda */}
         <mesh position={[-15, 1.5, 0]} receiveShadow castShadow>
           <boxGeometry args={[0.3, 3, 35]} />
-          <meshStandardMaterial color="#e8e0d0" roughness={0.95} />
+          <meshStandardMaterial color="#1e293b" roughness={0.95} />
         </mesh>
         
         {/* Pared trasera */}
         <mesh position={[0, 1.5, -15]} receiveShadow castShadow>
           <boxGeometry args={[35, 3, 0.3]} />
-          <meshStandardMaterial color="#e8e0d0" roughness={0.95} />
+          <meshStandardMaterial color="#1e293b" roughness={0.95} />
         </mesh>
         
         {/* Estaciones */}
@@ -206,17 +244,30 @@ export default function OfficeMap() {
         ))}
         
         {/* Agentes */}
-        {agents && agents
-          .filter(agent => agent && (agent.agentName || agent.name))
-          .map(agent => (
-            <AgentMesh key={agent.agentName || agent.name} agent={{
+        {(() => {
+          const safeAgents = (agents || [])
+            .filter(agent => agent && (agent.agentName || agent.name))
+            .map(agent => ({
               ...agent,
               agentName: agent.agentName || agent.name || 'Unknown',
               action: agent.action || 'idle',
               status: agent.status || 'running',
-            }} />
-          ))
-        }
+            }))
+
+          // Asignar índice de silla a los agentes en HQ
+          let hqSeatCounter = 0
+          return safeAgents.map(agent => {
+            const stationId = getStationIdForAction(agent.action)
+            const seatIndex = stationId === 'hq' ? hqSeatCounter++ : undefined
+            return (
+              <AgentMesh
+                key={agent.agentName}
+                agent={agent}
+                seatIndex={seatIndex}
+              />
+            )
+          })
+        })()}
         
         <OrbitControls enableRotate={false} enableZoom={false} enablePan={false} />
         </Canvas>
