@@ -208,9 +208,17 @@ export default function OfficeMap() {
         ))}
         
         {/* Agentes */}
-        {agents && agents.map(agent => (
-          <AgentMesh key={agent.agentName} agent={agent} />
-        ))}
+        {agents && agents
+          .filter(agent => agent && (agent.agentName || agent.name))
+          .map(agent => (
+            <AgentMesh key={agent.agentName || agent.name} agent={{
+              ...agent,
+              agentName: agent.agentName || agent.name || 'Unknown',
+              action: agent.action || 'idle',
+              status: agent.status || 'running',
+            }} />
+          ))
+        }
         
         <OrbitControls enableRotate={false} enableZoom={false} enablePan={false} />
         </Canvas>
