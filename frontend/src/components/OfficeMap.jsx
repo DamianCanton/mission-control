@@ -158,16 +158,6 @@ export default function OfficeMap() {
   const agents = useMissionStore(state => state.agents)
   const statusFilter = useMissionStore(state => state.statusFilter)
   const setStatusFilter = useMissionStore(state => state.setStatusFilter)
-  const [demoRunning, setDemoRunning] = React.useState(false)
-
-  const backendHost = window.location.hostname
-  const backendUrl = `http://${backendHost}:3000`
-
-  async function toggleDemo() {
-    const endpoint = demoRunning ? '/api/demo/stop' : '/api/demo/start'
-    await fetch(`${backendUrl}${endpoint}`)
-    setDemoRunning(prev => !prev)
-  }
 
   const FILTERS = [
     { key: 'all',       label: '⬡ All',       color: 'bg-gray-600' },
@@ -208,30 +198,6 @@ export default function OfficeMap() {
             {f.label}
           </button>
         ))}
-
-        {/* Separador */}
-        <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
-
-        {/* Botón Demo */}
-        <button
-          onClick={toggleDemo}
-          style={{
-            padding: '4px 16px',
-            borderRadius: 20,
-            fontSize: 12,
-            fontWeight: 700,
-            fontFamily: 'monospace',
-            border: demoRunning ? '2px solid #fbbf24' : '2px solid rgba(255,255,255,0.3)',
-            cursor: 'pointer',
-            background: demoRunning ? 'rgba(251,191,36,0.2)' : 'rgba(30,30,40,0.7)',
-            color: demoRunning ? '#fbbf24' : 'rgba(255,255,255,0.7)',
-            backdropFilter: 'blur(4px)',
-            transition: 'all 0.15s',
-            letterSpacing: '0.05em',
-          }}
-        >
-          {demoRunning ? '⏹ Stop Demo' : '▶ Demo'}
-        </button>
       </div>
       <div style={{ width: '100%', height: '100%', background: '#020617', borderRadius: '0.5rem', overflow: 'hidden' }}>
         <Canvas shadows gl={{ antialias: true }}>
