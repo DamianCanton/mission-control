@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  mission-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mission-backend
+    ports:
+      - "3000:3000"
+    restart: always
+    networks:
+      - mission-network
+
+  mission-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mission-frontend
+    ports:
+      - "3001:80"
+    restart: always
+    depends_on:
+      - mission-backend
+    networks:
+      - mission-network
+
+networks:
+  mission-network:
+    driver: bridge

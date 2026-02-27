@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 import { io } from 'socket.io-client';
 
-const socket = io('http://localhost:3000', {
+const host = window.location.hostname;
+const socketUrl = `http://${host}:3000`;
+const socket = io(socketUrl, {
   autoConnect: false,
 });
 
