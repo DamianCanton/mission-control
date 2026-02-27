@@ -33,15 +33,15 @@ const Agents = () => {
           </div>
         ) : (
           agents.map((agent) => (
-            <div key={agent.id} className="bg-gray-800 p-6 rounded-lg border border-gray-700 shadow-lg hover:border-gray-500 transition-colors">
+            <div key={agent.id || agent.agentName} className="bg-gray-800 p-6 rounded-lg border border-gray-700 shadow-lg hover:border-gray-500 transition-colors">
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-indigo-900 flex items-center justify-center text-indigo-300 font-bold text-lg">
-                    {agent.name.charAt(0)}
+                    {(agent.agentName || agent.name || '?').charAt(0)}
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-white">{agent.name}</h3>
-                    <p className="text-sm text-gray-400 font-mono text-xs">{agent.id}</p>
+                    <h3 className="text-lg font-semibold text-white">{agent.agentName || agent.name}</h3>
+                    <p className="text-sm text-gray-400 font-mono text-xs">{agent.action || agent.id || '—'}</p>
                   </div>
                 </div>
               </div>
