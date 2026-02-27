@@ -9,6 +9,8 @@ services:
     ports:
       - "3000:3000"
     restart: always
+    volumes:
+      - /tmp/openclaw:/tmp/openclaw:ro
     networks:
       - mission-network
 
