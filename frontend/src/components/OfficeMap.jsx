@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Html, OrthographicCamera, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
-import useMissionStore from '../store/useMissionStore';
+import { useMissionStore } from '../store/useMissionStore';
 
 const STATION_COORDS = {
   hq:        [0,   0,  0],
