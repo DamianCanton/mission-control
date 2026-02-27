@@ -102,17 +102,14 @@ export default function OfficeMap() {
   return (
     <div style={{ width: '100%', height: '500px', background: '#111827', borderRadius: '0.5rem', overflow: 'hidden' }}>
       <Canvas shadows>
-        <color attach="background" args={['#d4e9f7']} />
+        <color attach="background" args={['#111827']} />
         <OrthographicCamera makeDefault position={[20, 20, 20]} zoom={40} />
         <ambientLight intensity={0.6} color="#fff8e7" />
         <directionalLight position={[10, 15, 10]} intensity={1.2} castShadow shadow-mapSize={[2048,2048]} color="#fffacd" />
         <directionalLight position={[-5, 8, -10]} intensity={0.4} color="#c8e6ff" />
         
         {/* Piso */}
-        <mesh position={[0, -0.01, 0]} rotation={[-Math.PI/2, 0, 0]} receiveShadow>
-          <planeGeometry args={[40, 40]} />
-          <meshStandardMaterial color="#c8b99a" />
-        </mesh>
+        <gridHelper args={[30, 30, '#4b5563', '#374151']} position={[0, 0, 0]} />
         
         {/* Estaciones */}
         {Object.entries(STATION_COORDS).map(([id, pos]) => (
@@ -124,7 +121,7 @@ export default function OfficeMap() {
           <AgentMesh key={agent.agentName} agent={agent} />
         ))}
         
-        <OrbitControls enableRotate={false} enablePan={true} />
+        <OrbitControls enableRotate={false} enableZoom={false} enablePan={false} />
       </Canvas>
     </div>
   );

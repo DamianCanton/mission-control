@@ -1,4 +1,4 @@
-import { Text } from '@react-three/drei'
+import { Html } from '@react-three/drei'
 
 const STATION_META = {
   hq:        { label: '⭐ HQ',      color: '#fbbf24' },
@@ -46,17 +46,11 @@ export function DeskStation({ id, position }) {
         <meshStandardMaterial color="#374151" />
       </mesh>
       {/* Texto flotante */}
-      <Text
-        position={[0, 1.4, 0]}
-        fontSize={0.28}
-        color="#1f2937"
-        anchorX="center"
-        anchorY="middle"
-        outlineWidth={0.02}
-        outlineColor="#ffffff"
-      >
-        {meta.label}
-      </Text>
+      <Html center position={[0, 1.6, 0]} style={{ pointerEvents: 'none' }}>
+        <div className="bg-gray-800 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap font-medium">
+          {meta.label}
+        </div>
+      </Html>
     </group>
   )
 }
