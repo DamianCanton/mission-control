@@ -11,6 +11,9 @@ services:
     restart: always
     volumes:
       - /tmp/openclaw:/tmp/openclaw:ro
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL:-}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-}
     networks:
       - mission-network
 
@@ -18,6 +21,9 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL:-}
+        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY:-}
     container_name: mission-frontend
     ports:
       - "3001:80"

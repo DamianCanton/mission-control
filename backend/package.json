@@ -12,9 +12,13 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@supabase/supabase-js": "^2.98.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "socket.io": "^4.8.3",
     "tail": "^2.2.6"
+  },
+  "devDependencies": {
+    "pg": "^8.19.0"
   }
 }
