@@ -2,87 +2,53 @@ import React from 'react';
 import { useMissionStore } from '../store/useMissionStore';
 import OfficeMap from './OfficeMap';
 
+const StatCard = ({ label, value, icon, colorClass }) => (
+  <div className="bg-gray-800 p-4 md:p-6 rounded-lg border border-gray-700 shadow-lg">
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-xs md:text-sm font-medium text-gray-400 mb-1">{label}</p>
+        <h3 className="text-2xl md:text-3xl font-bold text-white">{value}</h3>
+      </div>
+      <div className={`p-2.5 md:p-3 ${colorClass} rounded-full`}>
+        <span className="text-lg md:text-xl">{icon}</span>
+      </div>
+    </div>
+  </div>
+);
+
 const Dashboard = () => {
-  const logs = useMissionStore(state => state.logs);
-  const agents = useMissionStore(state => state.agents);
+  const logs      = useMissionStore(state => state.logs);
+  const agents    = useMissionStore(state => state.agents);
   const connected = useMissionStore(state => state.connected);
 
-  // Calcula métricas
-  const totalLogs = logs.length;
+  const totalLogs    = logs.length;
   const activeAgents = agents.filter(a => a.status === 'running' || a.status === 'thinking').length;
-  const successLogs = logs.filter(l => l.status === 'completed').length;
-  const errorLogs = logs.filter(l => l.status === 'error').length;
-  
-  const successRate = totalLogs > 0 
-    ? ((successLogs / totalLogs) * 100).toFixed(1)
-    : 0;
+  const successLogs  = logs.filter(l => l.status === 'completed').length;
+  const errorLogs    = logs.filter(l => l.status === 'error').length;
+  const successRate  = totalLogs > 0 ? ((successLogs / totalLogs) * 100).toFixed(1) : 0;
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-3xl font-bold text-white mb-8">System Overview</h2>
-      
-      <div style={{ height: 'calc(100vh - 120px)' }}>
+    <div className="space-y-4 md:space-y-6">
+      <h2 className="text-2xl md:text-3xl font-bold text-white">System Overview</h2>
+
+      {/* 3D map — altura adaptable */}
+      <div className="rounded-lg overflow-hidden border border-gray-700"
+           style={{ height: 'clamp(240px, 45vh, 520px)' }}>
         <OfficeMap />
       </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Total Logs */}
-        <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-400 mb-1">Total Events</p>
-              <h3 className="text-3xl font-bold text-white">{totalLogs}</h3>
-            </div>
-            <div className="p-3 bg-blue-900/30 rounded-full">
-              <span className="text-blue-400 text-xl">📄</span>
-            </div>
-          </div>
-        </div>
 
-        {/* Active Agents */}
-        <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-400 mb-1">Active Agents</p>
-              <h3 className="text-3xl font-bold text-white">{activeAgents}</h3>
-            </div>
-            <div className="p-3 bg-green-900/30 rounded-full">
-              <span className="text-green-400 text-xl">🤖</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Success Rate */}
-        <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-400 mb-1">Success Rate</p>
-              <h3 className="text-3xl font-bold text-white">{successRate}%</h3>
-            </div>
-            <div className="p-3 bg-purple-900/30 rounded-full">
-              <span className="text-purple-400 text-xl">🚀</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Errors */}
-        <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-400 mb-1">Error Count</p>
-              <h3 className="text-3xl font-bold text-white">{errorLogs}</h3>
-            </div>
-            <div className="p-3 bg-red-900/30 rounded-full">
-              <span className="text-red-400 text-xl">⚠️</span>
-            </div>
-          </div>
-        </div>
+      {/* Stats grid — 2 cols en mobile, 4 en desktop */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+        <StatCard label="Total Events"  value={totalLogs}      icon="📄" colorClass="bg-blue-900/30"   />
+        <StatCard label="Active Agents" value={activeAgents}   icon="🤖" colorClass="bg-green-900/30"  />
+        <StatCard label="Success Rate"  value={`${successRate}%`} icon="🚀" colorClass="bg-purple-900/30" />
+        <StatCard label="Error Count"   value={errorLogs}      icon="⚠️" colorClass="bg-red-900/30"    />
       </div>
-      
+
       {!connected && (
-        <div className="mt-8 p-4 bg-red-900/50 border border-red-700 rounded-lg text-red-200 flex items-center gap-3">
+        <div className="p-4 bg-red-900/50 border border-red-700 rounded-lg text-red-200 flex items-center gap-3 text-sm">
           <span>⚠️</span>
-          <p>WebSocket disconnected. Waiting for connection to backend...</p>
+          <p>WebSocket disconnected. Waiting for backend...</p>
         </div>
       )}
     </div>
