@@ -30,7 +30,9 @@ const STATION_COMPAT = {
   misc: 'hq', wildcard: 'hq',
 };
 function normalizeStation(s) {
-  return STATION_COMPAT[s] ?? (STATION_ICON[normalizeStation(s)] ?? '⭐' ? s : 'hq');
+  if (!s) return 'hq';
+  const mapped = STATION_COMPAT[s] ?? s;
+  return STATION_ICON[mapped] ? mapped : 'hq';
 }
 
 
