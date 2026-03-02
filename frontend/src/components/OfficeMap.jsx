@@ -44,7 +44,10 @@ const HQ_SLOTS = Array.from({ length: 8 }, (_, i) => {
 function ResponsiveCamera({ isMobile }) {
   const { camera, size } = useThree();
   useEffect(() => {
-    const zoom = isMobile ? 28 : 55;
+    // Mobile: zoom pequeño para que entren las 9 estaciones
+    // La escena tiene coordenadas ±7 en X/Z, la cámara isométrica desde [15,18,15]
+    // necesita zoom ≈ 18 para verlas todas en 360px de ancho
+    const zoom = isMobile ? 18 : 55;
     camera.zoom = zoom;
     camera.updateProjectionMatrix();
   }, [camera, isMobile, size.width]);
@@ -139,14 +142,15 @@ export default function OfficeMap() {
   const statusFilter  = useMissionStore(state => state.statusFilter);
   const setStatusFilter = useMissionStore(state => state.setStatusFilter);
 
-  // Detectar mobile via containerRef para no depender de window
+  // Inicializar isMobile INMEDIATAMENTE con window.innerWidth
+  // para evitar el flash de zoom=55 en el primer render
   const containerRef = useRef(null);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
 
   useEffect(() => {
     if (!containerRef.current) return;
     const ro = new ResizeObserver(([entry]) => {
-      setIsMobile(entry.contentRect.width < 640);
+      setIsMobile(entry.contentRect.width < 768);
     });
     ro.observe(containerRef.current);
     return () => ro.disconnect();
@@ -207,7 +211,7 @@ export default function OfficeMap() {
       <div style={{ width: '100%', height: '100%', background: '#020617', borderRadius: '0.5rem', overflow: 'hidden' }}>
         <Canvas shadows gl={{ antialias: true }}>
           <color attach="background" args={['#020617']} />
-          <OrthographicCamera makeDefault position={[15, 18, 15]} zoom={isMobile ? 28 : 55} />
+          <OrthographicCamera makeDefault position={[15, 18, 15]} zoom={isMobile ? 18 : 55} />
           <ResponsiveCamera isMobile={isMobile} />
 
           <ambientLight intensity={0.5} />
