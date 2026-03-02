@@ -24,27 +24,27 @@ const STATION_ICON = {
   memory: '🧠', comms: '📡', agents: '🤖',
 };
 
-// Estaciones viejas → nuevas (compat con eventos históricos en DB)
 const STATION_COMPAT = {
   messages: 'comms', browser: 'dev', subagents: 'agents',
   misc: 'hq', wildcard: 'hq',
 };
+
 function normalizeStation(s) {
   if (!s) return 'hq';
   const mapped = STATION_COMPAT[s] ?? s;
   return STATION_ICON[mapped] ? mapped : 'hq';
 }
 
-
 function statusBadge(s)  { return STATUS_LIVE[s] ?? STATUS_LIVE.idle; }
-function statusDot(s)    { return STATUS_DOT[s] ?? null; }
+function statusDot(s)    { return STATUS_DOT[s]   ?? null; }
 
 function formatTimeAgo(iso) {
   if (!iso) return '—';
   const s = Math.floor((Date.now() - new Date(iso)) / 1000);
   if (s < 60)   return `${s}s ago`;
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  return `${Math.floor(s / 3600)}h ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
 }
 
 function formatDuration(start, end) {
@@ -61,6 +61,16 @@ function TaskRow({ task, agentDbId }) {
   const duration = formatDuration(task.started_at, task.ended_at);
   const station  = task.station;
 
+  // Inferir status real: si no tiene ended_at y started_at tiene >2min, probablemente completó
+  const inferredStatus = (() => {
+    if (task.status !== 'running') return task.status;
+    if (!task.ended_at) {
+      const ageMs = Date.now() - new Date(task.started_at);
+      if (ageMs > 2 * 60 * 1000) return 'completed'; // >2 min sin cerrar = completó
+    }
+    return task.status;
+  })();
+
   return (
     <Link
       to={`/agents/${agentDbId}/tasks/${task.id}`}
@@ -76,8 +86,8 @@ function TaskRow({ task, agentDbId }) {
         {duration && (
           <span className="font-mono text-xs text-gray-500">{duration}</span>
         )}
-        <span className={`px-2 py-0.5 rounded-full text-xs border ${statusBadge(task.status)}`}>
-          {task.status}
+        <span className={`px-2 py-0.5 rounded-full text-xs border ${statusBadge(inferredStatus)}`}>
+          {inferredStatus}
         </span>
       </div>
     </Link>
@@ -86,48 +96,33 @@ function TaskRow({ task, agentDbId }) {
 
 // ─── AgentCard ────────────────────────────────────────────────────────────────
 
-function AgentCard({ agent }) {
-  const [tasks,     setTasks]     = useState([]);
-  const [dbAgentId, setDbAgentId] = useState(null);
+function AgentCard({ agent, liveStatus }) {
+  const [tasks,        setTasks]        = useState([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
 
   const fetchTasks = useCallback(async () => {
-    if (!agent.agentName) return;
-
-    // 1. Buscar el agente en Supabase por nombre
-    const { data: agentRow } = await supabase
-      .from('agents')
-      .select('id')
-      .eq('name', agent.agentName)
-      .single();
-
-    if (!agentRow) {
-      setLoadingTasks(false);
-      return;
-    }
-
-    setDbAgentId(agentRow.id);
-
-    // 2. Últimas 8 tasks del agente
-    const { data: taskRows } = await supabase
+    if (!agent.id) return;
+    const { data } = await supabase
       .from('tasks')
       .select('id, title, status, station, started_at, ended_at')
-      .eq('agent_id', agentRow.id)
+      .eq('agent_id', agent.id)
       .order('started_at', { ascending: false })
       .limit(8);
-
-    setTasks(taskRows ?? []);
+    setTasks(data ?? []);
     setLoadingTasks(false);
-  }, [agent.agentName]);
+  }, [agent.id]);
 
   useEffect(() => {
     fetchTasks();
-    // Refrescar cada 10s si el agente está activo
     const interval = setInterval(fetchTasks, 10000);
     return () => clearInterval(interval);
   }, [fetchTasks]);
 
-  const dot = statusDot(agent.status);
+  // Combinar status DB con live WS
+  const currentStatus = liveStatus?.status ?? 'idle';
+  const currentAction = liveStatus?.action ?? 'idle';
+  const lastSeen      = liveStatus?.lastSeen ?? null;
+  const dot           = statusDot(currentStatus);
 
   return (
     <div className="bg-gray-800 rounded-lg border border-gray-700 shadow-lg hover:border-gray-600 transition-colors overflow-hidden">
@@ -137,26 +132,27 @@ function AgentCard({ agent }) {
           <div className="flex items-center gap-3">
             <div className="relative">
               <div className="w-10 h-10 rounded-full bg-indigo-900 flex items-center justify-center text-indigo-300 font-bold text-lg">
-                {(agent.agentName || '?').charAt(0)}
+                {(agent.name || '?').charAt(0)}
               </div>
               {dot && (
                 <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-gray-800 ${dot}`} />
               )}
             </div>
             <div>
-              <h3 className="text-base font-semibold text-white">{agent.agentName}</h3>
-              <p className="text-xs text-gray-500 font-mono mt-0.5">
-                {agent.action ?? 'idle'}
-              </p>
+              <h3 className="text-base font-semibold text-white">{agent.name}</h3>
+              <p className="text-xs text-gray-500 font-mono mt-0.5">{currentAction}</p>
             </div>
           </div>
-          <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${statusBadge(agent.status)}`}>
-            {agent.status ?? 'idle'}
+          <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${statusBadge(currentStatus)}`}>
+            {currentStatus}
           </span>
         </div>
 
         <div className="mt-3 flex gap-4 text-xs text-gray-500">
-          <span>Last seen: <span className="text-gray-400">{formatTimeAgo(agent.lastSeen)}</span></span>
+          {lastSeen
+            ? <span>Last seen: <span className="text-gray-400">{formatTimeAgo(lastSeen)}</span></span>
+            : <span className="text-gray-600 italic">Not active in this session</span>
+          }
         </div>
       </div>
 
@@ -164,9 +160,7 @@ function AgentCard({ agent }) {
       <div className="p-3">
         <div className="flex items-center justify-between px-1 mb-2">
           <span className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Recent Tasks</span>
-          {dbAgentId && (
-            <span className="text-xs text-gray-600 font-mono">{tasks.length} loaded</span>
-          )}
+          <span className="text-xs text-gray-600 font-mono">{tasks.length} loaded</span>
         </div>
 
         {loadingTasks ? (
@@ -175,12 +169,12 @@ function AgentCard({ agent }) {
           </div>
         ) : tasks.length === 0 ? (
           <div className="text-center py-4 text-xs text-gray-600 italic font-mono">
-            {dbAgentId ? 'No tasks recorded yet' : 'Agent not yet in DB'}
+            No tasks recorded yet
           </div>
         ) : (
           <div className="space-y-0.5">
             {tasks.map(task => (
-              <TaskRow key={task.id} task={task} agentDbId={dbAgentId} />
+              <TaskRow key={task.id} task={task} agentDbId={agent.id} />
             ))}
           </div>
         )}
@@ -192,26 +186,66 @@ function AgentCard({ agent }) {
 // ─── Agents ───────────────────────────────────────────────────────────────────
 
 const Agents = () => {
-  const agents = useMissionStore(state => state.agents);
+  const liveAgents = useMissionStore(state => state.agents);
+  const [dbAgents,  setDbAgents]  = useState([]);
+  const [loading,   setLoading]   = useState(true);
+
+  // Cargar todos los agentes de la DB al montar
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from('agents')
+        .select('id, name')
+        .order('name');
+      setDbAgents(data ?? []);
+      setLoading(false);
+    })();
+  }, []);
+
+  // Mapa agentName → live status (del WebSocket)
+  const liveMap = Object.fromEntries(
+    (liveAgents || []).map(a => [a.agentName || a.name, a])
+  );
+
+  // Unir DB + live: priorizar agentes de DB, overlay con live
+  const merged = dbAgents.map(a => ({
+    ...a,
+    liveStatus: liveMap[a.name] ?? null,
+  }));
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold text-white">Active Agents</h2>
-        <span className="text-sm text-gray-500 font-mono">{agents.length} online</span>
+        <h2 className="text-3xl font-bold text-white">Agents</h2>
+        <div className="flex items-center gap-3 text-sm font-mono">
+          <span className="text-gray-500">{merged.length} total</span>
+          {liveAgents.length > 0 && (
+            <span className="text-blue-400 animate-pulse">
+              {liveAgents.filter(a => a.status === 'running' || a.status === 'thinking').length} active
+            </span>
+          )}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {agents.length === 0 ? (
-          <div className="col-span-full text-center text-gray-500 py-16 font-mono text-sm">
-            No agents currently active
-          </div>
-        ) : (
-          agents.map(agent => (
-            <AgentCard key={agent.id || agent.agentName} agent={agent} />
-          ))
-        )}
-      </div>
+      {loading ? (
+        <div className="flex items-center justify-center py-24">
+          <div className="w-8 h-8 border-2 border-gray-600 border-t-blue-400 rounded-full animate-spin" />
+        </div>
+      ) : merged.length === 0 ? (
+        <div className="text-center text-gray-500 py-16 font-mono text-sm">
+          No agents in database yet
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {merged.map(agent => (
+            <AgentCard
+              key={agent.id}
+              agent={agent}
+              liveStatus={agent.liveStatus}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
