@@ -1,4 +1,5 @@
 const express = require('express');
+const { randomUUID } = require('crypto');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
@@ -37,6 +38,9 @@ let activeAgents = {}; // keyed by agentName
 const agentIdCache = {};
 // { runId -> task_id (uuid) }
 const taskIdCache = {};
+// Stack de eventos activos por agente para cadenas causales
+// { agentName -> [eventId, ...] }  (tope = evento activo actual)
+const eventStack = {};
 
 // ─── Helpers Supabase (async, fire-and-forget, nunca bloquean el WebSocket) ──
 
@@ -117,26 +121,57 @@ async function upsertAgent(agentName) {
 
 /**
  * Inserta un evento en la tabla `agent_events`.
- * Columnas corregidas según schema: occurred_at, agent_name, station (no subsystem/details/timestamp).
+ * Gestiona el stack de cadenas causales por agente:
+ *   - Eventos "tool start" (running, station != hq) → se pushean al stack
+ *   - Eventos "tool end" (_done / completed / error) → popean el stack
+ *   - Todos los eventos reciben parent_event_id = tope actual del stack
+ * Retorna el eventId generado (para el WebSocket).
  */
 async function insertEvent(entry, agentId) {
-  if (!supabase || !agentId) return;
+  if (!supabase || !agentId) return null;
+
+  const stack    = eventStack[entry.agentName] || [];
+  const parentId = stack.length > 0 ? stack[stack.length - 1] : null;
+  const eventId  = randomUUID();
+  const station  = mapActionToStation(entry.action);
 
   try {
     const { error } = await supabase.from('agent_events').insert({
-      agent_id:    agentId,
-      agent_name:  entry.agentName,
-      action:      entry.action,
-      status:      entry.status,
-      station:     mapActionToStation(entry.action),
-      occurred_at: entry.timestamp,
-      metadata:    { subsystem: entry.subsystem, details: entry.details },
-      raw_log:     entry.details,
-      // session_id omitido — nullable en MVP, no gestionamos sesiones todavía
+      id:              eventId,
+      agent_id:        agentId,
+      agent_name:      entry.agentName,
+      action:          entry.action,
+      status:          entry.status,
+      station:         station,
+      occurred_at:     entry.timestamp,
+      metadata:        { subsystem: entry.subsystem, details: entry.details },
+      raw_log:         entry.details,
+      parent_event_id: parentId,
+      // session_id omitido — nullable en MVP
     });
     if (error) throw error;
+
+    // ── Gestión del stack ──────────────────────────────────────────────────
+    // Push: tool activa (running) que NO sea hq (no queremos thinking/idle en el stack)
+    if (entry.status === 'running' && station !== 'hq') {
+      if (!eventStack[entry.agentName]) eventStack[entry.agentName] = [];
+      eventStack[entry.agentName].push(eventId);
+      // Cap: máximo 8 niveles de profundidad para evitar leaks
+      if (eventStack[entry.agentName].length > 8)
+        eventStack[entry.agentName].shift();
+    }
+    // Pop: tool terminada
+    else if (entry.action.endsWith('_done') ||
+             entry.status === 'completed'   ||
+             entry.status === 'error') {
+      if (eventStack[entry.agentName]?.length > 0)
+        eventStack[entry.agentName].pop();
+    }
+
+    return eventId;
   } catch (err) {
     console.error('[supabase] insertEvent error:', err.message);
+    return null;
   }
 }
 
@@ -189,17 +224,20 @@ async function upsertTask(entry, agentId) {
 
 /**
  * Punto central de persistencia. Fire-and-forget, nunca bloquea el WebSocket.
+ * Retorna una Promise con el eventId generado (para enriquecer el WebSocket emit).
  */
-function persistEntry(entry) {
-  if (!supabase) return;
+async function persistEntry(entry) {
+  if (!supabase) return null;
 
-  upsertAgent(entry.agentName).then((agentId) => {
-    if (!agentId) return;
-    Promise.all([
-      insertEvent(entry, agentId),
-      upsertTask(entry, agentId),
-    ]).catch(() => {});
-  });
+  const agentId = await upsertAgent(entry.agentName);
+  if (!agentId) return null;
+
+  const [eventId] = await Promise.all([
+    insertEvent(entry, agentId),
+    upsertTask(entry, agentId),
+  ]).catch(() => [null]);
+
+  return eventId;
 }
 
 // ─── Log path ────────────────────────────────────────────────────────────────
@@ -327,11 +365,19 @@ function startTailer() {
       const skip = ['abort failed', 'heartbeat', 'keepalive'];
       if (skip.some(s => entry.details.includes(s))) return;
 
-      // 1. WebSocket — siempre, sincrónico
+      // 1. Capturar parent_event_id del stack ANTES de persistir
+      //    (el stack se actualiza dentro de insertEvent, pero el parent actual
+      //     ya está en el tope AHORA, antes del push)
+      const currentStack = eventStack[entry.agentName] || [];
+      entry.parentEventId = currentStack.length > 0
+        ? currentStack[currentStack.length - 1]
+        : null;
+
+      // 2. WebSocket — siempre, sincrónico, con parentEventId ya adjunto
       io.emit('agent_log', entry);
       updateAgent(entry);
 
-      // 2. Supabase — async, fire-and-forget, nunca bloquea el stream
+      // 3. Supabase — async, fire-and-forget, nunca bloquea el stream
       persistEntry(entry);
 
     } catch {

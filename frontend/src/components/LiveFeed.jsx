@@ -44,51 +44,111 @@ function inferStation(log) {
 
 // ─── LogCard ──────────────────────────────────────────────────────────────────
 
-function LogCard({ log }) {
-  const [expanded, setExpanded] = useState(false);
+function LogCard({ log, depth = 0, children }) {
+  const [expanded,      setExpanded]      = useState(false);
+  const [childrenOpen,  setChildrenOpen]  = useState(true);
   const station = inferStation(log);
   const meta    = STATION_META[station] ?? STATION_META.hq;
   const ts      = log.timestamp ?? log.occurred_at;
+  const hasChildren = children && children.length > 0;
 
   return (
-    <div
-      className="p-3 bg-gray-800/80 border border-gray-700 rounded-lg shadow-sm hover:border-gray-600 transition-colors cursor-pointer select-none"
-      onClick={() => log.details && setExpanded(e => !e)}
-    >
-      {/* Fila superior */}
-      <div className="flex items-center justify-between gap-2 mb-1.5">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className="shrink-0">{meta.icon}</span>
-          <span className="text-gray-500 text-xs font-mono shrink-0">
-            {ts ? new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}
-          </span>
-          <span className="text-gray-600 text-xs font-mono hidden sm:inline truncate">
-            {meta.label}
-          </span>
-        </div>
-        <span className={`px-2 py-0.5 rounded-full text-xs border shrink-0 ${statusColor(log.status)}`}>
-          {log.status}
-        </span>
-      </div>
+    <div style={{ marginLeft: depth * 16 }}>
+      <div
+        className={`p-3 rounded-lg shadow-sm transition-colors cursor-pointer select-none border ${
+          depth === 0
+            ? 'bg-gray-800/80 border-gray-700 hover:border-gray-600'
+            : 'bg-gray-800/40 border-gray-700/50 hover:border-gray-600/70'
+        }`}
+        onClick={() => log.details && setExpanded(e => !e)}
+      >
+        {/* Indicador de cadena */}
+        {depth > 0 && (
+          <div className="flex items-center gap-1 mb-1">
+            <span className="text-gray-600 text-xs font-mono">{'└─'.padStart(depth * 2, '·')}</span>
+            <span className="text-indigo-500/60 text-xs font-mono">child</span>
+          </div>
+        )}
 
-      {/* Agente + acción */}
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <span className="font-bold text-gray-200 text-xs">{log.agentName ?? log.agent_name ?? '?'}</span>
-        <span className="text-gray-600 text-xs">→</span>
-        <span className="text-blue-400 font-semibold text-xs break-all">{log.action}</span>
-        {log.details && (
-          <span className="ml-auto text-gray-600 text-xs">{expanded ? '▲' : '▼'}</span>
+        {/* Fila superior */}
+        <div className="flex items-center justify-between gap-2 mb-1.5">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="shrink-0">{meta.icon}</span>
+            <span className="text-gray-500 text-xs font-mono shrink-0">
+              {ts ? new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}
+            </span>
+            <span className="text-gray-600 text-xs font-mono hidden sm:inline truncate">
+              {meta.label}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {hasChildren && (
+              <button
+                className="text-indigo-400/70 text-xs font-mono hover:text-indigo-300 transition-colors"
+                onClick={e => { e.stopPropagation(); setChildrenOpen(o => !o); }}
+              >
+                {childrenOpen ? `▾ ${children.length}` : `▸ ${children.length}`}
+              </button>
+            )}
+            <span className={`px-2 py-0.5 rounded-full text-xs border ${statusColor(log.status)}`}>
+              {log.status}
+            </span>
+          </div>
+        </div>
+
+        {/* Agente + acción */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="font-bold text-gray-200 text-xs">{log.agentName ?? log.agent_name ?? '?'}</span>
+          <span className="text-gray-600 text-xs">→</span>
+          <span className="text-blue-400 font-semibold text-xs break-all">{log.action}</span>
+          {log.details && (
+            <span className="ml-auto text-gray-600 text-xs">{expanded ? '▲' : '▼'}</span>
+          )}
+        </div>
+
+        {/* Detalle expandible */}
+        {expanded && log.details && (
+          <div className="mt-2 pl-2 border-l-2 border-gray-700 text-gray-400 font-mono text-xs break-all whitespace-pre-wrap">
+            {log.details}
+          </div>
         )}
       </div>
 
-      {/* Detalle expandible */}
-      {expanded && log.details && (
-        <div className="mt-2 pl-2 border-l-2 border-gray-700 text-gray-400 font-mono text-xs break-all whitespace-pre-wrap">
-          {log.details}
+      {/* Hijos */}
+      {hasChildren && childrenOpen && (
+        <div className="mt-1 space-y-1">
+          {children.map((child, i) => (
+            <LogCard key={child.id ?? i} log={child} depth={depth + 1} children={child._children} />
+          ))}
         </div>
       )}
     </div>
   );
+}
+
+// ─── buildTree ─────────────────────────────────────────────────────────────
+// Convierte lista plana de logs en árbol usando parentEventId.
+// Los logs sin parentEventId (o con padre no encontrado) son raíces.
+function buildTree(logs) {
+  const byId  = new Map();
+  const roots = [];
+
+  // Primer paso: indexar todos por id
+  for (const log of logs) {
+    byId.set(log.id, { ...log, _children: [] });
+  }
+
+  // Segundo paso: construir árbol
+  for (const [id, node] of byId) {
+    const parentId = node.parentEventId ?? node.parent_event_id ?? null;
+    if (parentId && byId.has(parentId)) {
+      byId.get(parentId)._children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+
+  return roots;
 }
 
 // ─── LiveFeed ─────────────────────────────────────────────────────────────────
@@ -101,6 +161,7 @@ const LiveFeed = () => {
   const [stationFilter, setStationFilter] = useState('all');
   const [statusFilter,  setStatusFilter]  = useState('all');
   const [search,        setSearch]        = useState('');
+  const [treeMode,      setTreeMode]      = useState(false);
 
   // Logs filtrados — orden: más nuevos primero
   const filtered = useMemo(() => {
@@ -121,6 +182,13 @@ const LiveFeed = () => {
       });
   }, [logs, stationFilter, statusFilter, search]);
 
+  // Árbol causal — solo cuando treeMode está activo
+  const treeRoots = useMemo(() => treeMode ? buildTree(filtered) : [], [filtered, treeMode]);
+  const chainCount = useMemo(() =>
+    filtered.filter(l => (l.parentEventId ?? l.parent_event_id)).length,
+    [filtered]
+  );
+
   return (
     <div
       className="flex flex-col bg-gray-900 border border-gray-700 rounded-lg overflow-hidden shadow-lg"
@@ -130,9 +198,26 @@ const LiveFeed = () => {
       <div className="bg-gray-800 border-b border-gray-700 shrink-0">
         <div className="px-4 py-3 flex items-center justify-between">
           <h2 className="text-base md:text-lg font-semibold text-white">Live Feed</h2>
-          <span className="text-xs text-gray-500 font-mono">
-            {filtered.length} / {logs.length}
-          </span>
+          <div className="flex items-center gap-2">
+            {/* Toggle árbol */}
+            <button
+              onClick={() => setTreeMode(m => !m)}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-mono font-semibold border transition-all ${
+                treeMode
+                  ? 'bg-indigo-700 text-white border-indigo-500'
+                  : 'bg-transparent text-gray-500 border-gray-700 hover:border-gray-500 hover:text-gray-300'
+              }`}
+              title="Modo árbol causal"
+            >
+              🌿 {treeMode ? 'Tree' : 'Flat'}
+              {chainCount > 0 && !treeMode && (
+                <span className="ml-1 bg-indigo-600 text-white rounded-full px-1.5 text-xs">{chainCount}</span>
+              )}
+            </button>
+            <span className="text-xs text-gray-500 font-mono">
+              {filtered.length} / {logs.length}
+            </span>
+          </div>
         </div>
 
         {/* Búsqueda */}
@@ -195,6 +280,10 @@ const LiveFeed = () => {
           <div className="text-gray-600 text-center italic text-sm font-mono mt-10">
             {logs.length === 0 ? 'Awaiting incoming logs…' : 'Ningún log coincide con los filtros.'}
           </div>
+        ) : treeMode ? (
+          treeRoots.map((node, i) => (
+            <LogCard key={node.id ?? i} log={node} depth={0} children={node._children} />
+          ))
         ) : (
           filtered.map((log, i) => (
             <LogCard key={log.id ?? i} log={log} />
