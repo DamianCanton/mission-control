@@ -41,21 +41,54 @@ const taskIdCache = {};
 // ─── Helpers Supabase (async, fire-and-forget, nunca bloquean el WebSocket) ──
 
 /**
- * Mapea una acción del log a la station_name enum del schema.
+ * Mapea una acción del log a las 7 estaciones definidas.
+ *
+ * Estaciones: hq · dev · files · search · memory · comms · wildcard
+ *
+ * Orden de evaluación: de más específico a más general.
+ * El fallback es 'hq' (no 'wildcard') para estados genéricos del agente.
  */
 function mapActionToStation(action) {
-  if (!action) return 'wildcard';
-  const a = action.toLowerCase();
-  if (['exec', 'write', 'edit', 'read'].some(k => a.includes(k) && !a.includes('read') && !a.includes('write')) || a === 'exec') return 'dev';
-  if (a === 'read' || a === 'write' || a === 'edit' || a.includes('file')) return 'files';
-  if (a.includes('web_search') || a.includes('web_fetch') || a.includes('search')) return 'search';
+  if (!action) return 'hq';
+  const a = action.toLowerCase().trim();
+
+  // 1. HQ — estados del agente, no tool calls
+  if (['idle', 'thinking', 'initializing', 'completed', 'error',
+       'heartbeat', 'new', 'tool_done'].includes(a)) return 'hq';
+  if (a.endsWith('_done')) return 'hq';
+
+  // 2. Memory
   if (a.includes('memory')) return 'memory';
-  if (a.includes('message') || a.includes('telegram') || a.includes('discord')) return 'messages';
+
+  // 3. Search / Web
+  if (a.includes('web_search') || a.includes('web_fetch') ||
+      a.includes('search') || a.includes('fetch')) return 'search';
+
+  // 4. Browser
   if (a.includes('browser')) return 'browser';
-  if (a.includes('agent') || a.includes('session') || a.includes('spawn') || a.includes('subagent')) return 'agents';
-  if (a === 'thinking' || a === 'initializing' || a === 'completed' || a === 'idle') return 'hq';
-  if (a.includes('exec')) return 'dev';
-  return 'wildcard';
+
+  // 5. Comms — mensajería y voz
+  if (a.includes('message') || a.includes('telegram') ||
+      a.includes('discord') || a.includes('tts') ||
+      a.includes('send') || a.includes('notify')) return 'comms';
+
+  // 6. Files — operaciones de archivo
+  if (a === 'read' || a === 'write' || a === 'edit' ||
+      a.includes('file') || a.includes('read') ||
+      a.includes('write') || a.includes('edit')) return 'files';
+
+  // 7. Dev — ejecución de código y shell
+  if (a === 'exec' || a.includes('exec') || a.includes('bash') ||
+      a.includes('code') || a.includes('run') ||
+      a.includes('process') || a.includes('canvas')) return 'dev';
+
+  // 8. Agents — sesiones y sub-agentes
+  if (a.includes('agent') || a.includes('session') ||
+      a.includes('spawn') || a.includes('subagent') ||
+      a.includes('nodes')) return 'agents';
+
+  // Fallback → hq (el agente está activo pero no en una tool conocida)
+  return 'hq';
 }
 
 /**

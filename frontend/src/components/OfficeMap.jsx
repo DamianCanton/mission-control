@@ -6,15 +6,13 @@ import { useMissionStore } from '../store/useMissionStore';
 import { DeskStation } from './DeskStation';
 
 const STATION_COORDS = {
-  hq:        [0,   0,  0],
-  dev:       [-6,  0, -5],
-  search:    [6,   0, -5],
-  files:     [-6,  0,  5],
-  memory:    [6,   0,  5],
-  comms:     [0,   0, -7],
-  browser:   [-6,  0,  0],
-  subagents: [6,   0,  0],
-  misc:      [0,   0,  7],
+  hq:      [ 0,  0,  0],   // Centro
+  dev:     [-6,  0, -4],   // Atrás izquierda
+  files:   [ 6,  0, -4],   // Atrás derecha
+  search:  [-6,  0,  4],   // Adelante izquierda
+  memory:  [ 6,  0,  4],   // Adelante derecha
+  comms:   [ 0,  0, -7],   // Fondo centro
+  agents:  [ 0,  0,  7],   // Frente centro
 };
 
 const STATION_LABELS = {
@@ -24,15 +22,15 @@ const STATION_LABELS = {
 };
 
 function getStationIdForAction(action = '') {
-  const a = action.toLowerCase();
-  if (a.includes('search') || a.includes('fetch'))                     return 'search';
-  if (a.includes('exec')   || a.includes('code') || a.includes('bash')) return 'dev';
-  if (a.includes('read')   || a.includes('write') || a.includes('edit')) return 'files';
-  if (a.includes('memory'))                                              return 'memory';
-  if (a.includes('message') || a.includes('send') || a.includes('telegram')) return 'comms';
-  if (a.includes('browser'))                                             return 'browser';
-  if (a.includes('session') || a.includes('subagent') || a.includes('spawn')) return 'subagents';
-  return 'misc';
+  const a = action.toLowerCase().trim();
+  if (['idle','thinking','initializing','completed','error','heartbeat','new'].includes(a) || a.endsWith('_done')) return 'hq';
+  if (a.includes('memory'))                                                  return 'memory';
+  if (a.includes('web_search') || a.includes('web_fetch') || a.includes('search') || a.includes('fetch')) return 'search';
+  if (a.includes('message') || a.includes('telegram') || a.includes('tts') || a.includes('send'))         return 'comms';
+  if (a.includes('read') || a.includes('write') || a.includes('edit') || a.includes('file'))               return 'files';
+  if (a.includes('exec') || a.includes('bash') || a.includes('run') || a.includes('canvas'))               return 'dev';
+  if (a.includes('agent') || a.includes('spawn') || a.includes('session') || a.includes('nodes'))         return 'agents';
+  return 'hq';
 }
 
 const HQ_SLOTS = Array.from({ length: 8 }, (_, i) => {

@@ -12,30 +12,28 @@ const STATUS_COLOR = {
 function statusColor(s) { return STATUS_COLOR[s] ?? 'bg-gray-800 text-gray-300 border-gray-600'; }
 
 const STATION_META = {
-  dev:      { icon: '💻', label: 'Dev'      },
-  search:   { icon: '🔍', label: 'Search'   },
-  files:    { icon: '📁', label: 'Files'    },
-  memory:   { icon: '🧠', label: 'Memory'   },
-  messages: { icon: '📨', label: 'Messages' },
-  browser:  { icon: '🌐', label: 'Browser'  },
-  agents:   { icon: '🤖', label: 'Agents'   },
-  hq:       { icon: '🏢', label: 'HQ'       },
-  wildcard: { icon: '🔮', label: 'Wildcard' },
+  hq:     { icon: '⭐', label: 'HQ'     },
+  dev:    { icon: '💻', label: 'Dev'    },
+  files:  { icon: '📁', label: 'Files'  },
+  search: { icon: '🔍', label: 'Search' },
+  memory: { icon: '🧠', label: 'Memory' },
+  comms:  { icon: '📡', label: 'Comms'  },
+  agents: { icon: '🤖', label: 'Agents' },
 };
 
-// Intentar inferir station desde el log si no viene explícito
+// Inferir station desde el log, sincronizado con mapActionToStation del backend
 function inferStation(log) {
-  if (log.station)    return log.station;
-  if (log.subsystem)  return log.subsystem;
-  const a = (log.action ?? '').toLowerCase();
-  if (a.includes('exec') || a.includes('bash') || a.includes('code')) return 'dev';
-  if (a.includes('search') || a.includes('fetch'))                    return 'search';
-  if (a.includes('read') || a.includes('write') || a.includes('edit')) return 'files';
-  if (a.includes('memory'))                                            return 'memory';
-  if (a.includes('message') || a.includes('telegram'))                return 'messages';
-  if (a.includes('browser'))                                           return 'browser';
-  if (a.includes('spawn') || a.includes('agent'))                      return 'agents';
-  return 'wildcard';
+  if (log.station)   return log.station;
+  if (log.subsystem) return log.subsystem;
+  const a = (log.action ?? '').toLowerCase().trim();
+  if (['idle','thinking','initializing','completed','error','heartbeat','new'].includes(a) || a.endsWith('_done')) return 'hq';
+  if (a.includes('memory'))                                                                   return 'memory';
+  if (a.includes('web_search') || a.includes('web_fetch') || a.includes('search') || a.includes('fetch')) return 'search';
+  if (a.includes('message') || a.includes('telegram') || a.includes('tts') || a.includes('send'))         return 'comms';
+  if (a.includes('read') || a.includes('write') || a.includes('edit') || a.includes('file'))               return 'files';
+  if (a.includes('exec') || a.includes('bash') || a.includes('run') || a.includes('canvas'))               return 'dev';
+  if (a.includes('agent') || a.includes('spawn') || a.includes('session') || a.includes('nodes'))         return 'agents';
+  return 'hq';
 }
 
 // ─── LogCard ──────────────────────────────────────────────────────────────────

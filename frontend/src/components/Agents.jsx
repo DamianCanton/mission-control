@@ -20,8 +20,8 @@ const STATUS_DOT = {
 };
 
 const STATION_ICON = {
-  hq: '🏢', dev: '💻', search: '🔍', files: '📁',
-  memory: '🧠', messages: '📨', browser: '🌐', agents: '🤖', wildcard: '🔮',
+  hq: '⭐', dev: '💻', files: '📁', search: '🔍',
+  memory: '🧠', comms: '📡', agents: '🤖',
 };
 
 function statusBadge(s)  { return STATUS_LIVE[s] ?? STATUS_LIVE.idle; }
@@ -55,7 +55,7 @@ function TaskRow({ task, agentDbId }) {
       className="flex items-center justify-between px-3 py-2 rounded-md hover:bg-gray-700/60 transition-colors group"
     >
       <div className="flex items-center gap-2 min-w-0">
-        <span className="text-base shrink-0">{STATION_ICON[station] ?? '🔮'}</span>
+        <span className="text-base shrink-0">{STATION_ICON[station] ?? '⭐'}</span>
         <span className="font-mono text-xs text-gray-300 truncate group-hover:text-white transition-colors">
           {task.title ?? task.id.slice(0, 12) + '…'}
         </span>

@@ -21,9 +21,8 @@ const STATUS_DOT = {
 };
 
 const STATION_ICON = {
-  hq:       '🏢', dev:      '💻', search:   '🔍',
-  files:    '📁', memory:   '🧠', messages: '📨',
-  browser:  '🌐', agents:   '🤖', wildcard: '🔮',
+  hq: '⭐', dev: '💻', files: '📁', search: '🔍',
+  memory: '🧠', comms: '📡', agents: '🤖',
 };
 
 function statusStyle(s) { return STATUS_STYLES[s] ?? STATUS_STYLES.idle; }
@@ -77,7 +76,7 @@ function EventRow({ event }) {
           <span className="text-blue-400 font-mono text-xs font-semibold">{event.action}</span>
           {station && (
             <span className="text-gray-500 text-xs">
-              {STATION_ICON[station] ?? '🔮'} {station}
+              {STATION_ICON[station] ?? '⭐'} {station}
             </span>
           )}
         </div>
@@ -213,7 +212,7 @@ const TaskDetail = () => {
           <div>
             <div className="flex items-center gap-2 mb-1">
               {task.station && (
-                <span className="text-xl">{STATION_ICON[task.station] ?? '🔮'}</span>
+                <span className="text-xl">{STATION_ICON[task.station] ?? '⭐'}</span>
               )}
               <h1 className="text-xl font-bold text-white font-mono">{task.title ?? task.id}</h1>
             </div>
