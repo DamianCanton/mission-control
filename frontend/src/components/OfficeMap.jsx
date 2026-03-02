@@ -184,12 +184,24 @@ function ConnectionsLayer({ connections }) {
 
 // ─── Cámara responsiva ────────────────────────────────────────────────────────
 
+// La escena ocupa ~±8 unidades en X y ~±9 en Z (estaciones más alejadas: comms/agents en z=±7).
+// La cámara isométrica proyecta desde [15,18,15]: el eje diagonal comprime ~√2 en cada dimensión.
+// Queremos que las 7 estaciones entren con margen → calculamos el zoom a partir del tamaño real del canvas.
+// factor = min(width, height * 0.85) / 22  (22 ≈ diámetro aparente de la escena en unidades de pantalla)
 function ResponsiveCamera({ isMobile }) {
-  const { camera } = useThree();
+  const { camera, size } = useThree();
   useEffect(() => {
-    camera.zoom = isMobile ? 18 : 55;
+    let zoom;
+    if (isMobile) {
+      zoom = 18;
+    } else {
+      // Ajustar por el tamaño real del canvas — escena ≈ 22 unidades de diámetro aparente
+      const effective = Math.min(size.width, size.height * 0.85);
+      zoom = Math.max(30, Math.min(70, effective / 22));
+    }
+    camera.zoom = zoom;
     camera.updateProjectionMatrix();
-  }, [camera, isMobile]);
+  }, [camera, isMobile, size.width, size.height]);
   return null;
 }
 
@@ -356,8 +368,7 @@ export default function OfficeMap() {
       <div style={{ width: '100%', height: '100%', background: '#020617', borderRadius: '0.5rem', overflow: 'hidden' }}>
         <Canvas shadows gl={{ antialias: true }}>
           <color attach="background" args={['#020617']} />
-          <OrthographicCamera makeDefault position={[15, 18, 15]} zoom={isMobile ? 18 : 55} />
-          <ResponsiveCamera isMobile={isMobile} />
+          <OrthographicCamera makeDefault position={[15, 18, 15]} zoom={isMobile ? 18 : 55} />          <ResponsiveCamera isMobile={isMobile} />
 
           <ambientLight intensity={0.5} />
           <directionalLight

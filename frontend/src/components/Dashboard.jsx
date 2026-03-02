@@ -31,9 +31,8 @@ const Dashboard = () => {
     <div className="space-y-4 md:space-y-6">
       <h2 className="text-2xl md:text-3xl font-bold text-white">System Overview</h2>
 
-      {/* 3D map — más alto en mobile para que entren todas las estaciones */}
-      <div className="rounded-lg overflow-hidden border border-gray-700"
-           style={{ height: 'clamp(320px, 55vw, 520px)' }}>
+      {/* 3D map — mobile: basado en vw / desktop: fijo en alto generoso */}
+      <div className="rounded-lg overflow-hidden border border-gray-700 h-[320px] sm:h-[380px] md:h-[580px] lg:h-[640px]">
         <OfficeMap />
       </div>
 
