@@ -24,6 +24,16 @@ const STATION_ICON = {
   memory: '🧠', comms: '📡', agents: '🤖',
 };
 
+// Estaciones viejas → nuevas (compat con eventos históricos en DB)
+const STATION_COMPAT = {
+  messages: 'comms', browser: 'dev', subagents: 'agents',
+  misc: 'hq', wildcard: 'hq',
+};
+function normalizeStation(s) {
+  return STATION_COMPAT[s] ?? (STATION_ICON[normalizeStation(s)] ?? '⭐' ? s : 'hq');
+}
+
+
 function statusBadge(s)  { return STATUS_LIVE[s] ?? STATUS_LIVE.idle; }
 function statusDot(s)    { return STATUS_DOT[s] ?? null; }
 
@@ -55,7 +65,7 @@ function TaskRow({ task, agentDbId }) {
       className="flex items-center justify-between px-3 py-2 rounded-md hover:bg-gray-700/60 transition-colors group"
     >
       <div className="flex items-center gap-2 min-w-0">
-        <span className="text-base shrink-0">{STATION_ICON[station] ?? '⭐'}</span>
+        <span className="text-base shrink-0">{STATION_ICON[normalizeStation(station)] ?? '⭐'}</span>
         <span className="font-mono text-xs text-gray-300 truncate group-hover:text-white transition-colors">
           {task.title ?? task.id.slice(0, 12) + '…'}
         </span>

@@ -25,6 +25,16 @@ const STATION_ICON = {
   memory: '🧠', comms: '📡', agents: '🤖',
 };
 
+// Estaciones viejas → nuevas (compat con eventos históricos en DB)
+const STATION_COMPAT = {
+  messages: 'comms', browser: 'dev', subagents: 'agents',
+  misc: 'hq', wildcard: 'hq',
+};
+function normalizeStation(s) {
+  return STATION_COMPAT[s] ?? (STATION_ICON[normalizeStation(s)] ?? '⭐' ? s : 'hq');
+}
+
+
 function statusStyle(s) { return STATUS_STYLES[s] ?? STATUS_STYLES.idle; }
 function statusDot(s)   { return STATUS_DOT[s]    ?? STATUS_DOT.idle;    }
 
@@ -76,7 +86,7 @@ function EventRow({ event }) {
           <span className="text-blue-400 font-mono text-xs font-semibold">{event.action}</span>
           {station && (
             <span className="text-gray-500 text-xs">
-              {STATION_ICON[station] ?? '⭐'} {station}
+              {STATION_ICON[normalizeStation(station)] ?? '⭐'} {station}
             </span>
           )}
         </div>
@@ -212,7 +222,7 @@ const TaskDetail = () => {
           <div>
             <div className="flex items-center gap-2 mb-1">
               {task.station && (
-                <span className="text-xl">{STATION_ICON[task.station] ?? '⭐'}</span>
+                <span className="text-xl">{STATION_ICON[normalizeStation(task.station)] ?? '⭐'}</span>
               )}
               <h1 className="text-xl font-bold text-white font-mono">{task.title ?? task.id}</h1>
             </div>

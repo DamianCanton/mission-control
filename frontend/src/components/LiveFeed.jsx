@@ -22,9 +22,15 @@ const STATION_META = {
 };
 
 // Inferir station desde el log, sincronizado con mapActionToStation del backend
+// Mapa de estaciones viejas → nuevas (compatibilidad con eventos históricos en DB)
+const STATION_COMPAT = {
+  messages: 'comms', browser: 'dev', subagents: 'agents',
+  misc: 'hq', wildcard: 'hq', comms: 'comms',
+};
+
 function inferStation(log) {
-  if (log.station)   return log.station;
-  if (log.subsystem) return log.subsystem;
+  const raw = log.station || log.subsystem || null;
+  if (raw) return STATION_COMPAT[raw] ?? (STATION_META[raw] ? raw : 'hq');
   const a = (log.action ?? '').toLowerCase().trim();
   if (['idle','thinking','initializing','completed','error','heartbeat','new'].includes(a) || a.endsWith('_done')) return 'hq';
   if (a.includes('memory'))                                                                   return 'memory';
@@ -41,7 +47,7 @@ function inferStation(log) {
 function LogCard({ log }) {
   const [expanded, setExpanded] = useState(false);
   const station = inferStation(log);
-  const meta    = STATION_META[station] ?? STATION_META.wildcard;
+  const meta    = STATION_META[station] ?? STATION_META.hq;
   const ts      = log.timestamp ?? log.occurred_at;
 
   return (
