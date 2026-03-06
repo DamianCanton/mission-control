@@ -373,7 +373,15 @@ async function persistEntry(entry) {
 // ─── Log path ────────────────────────────────────────────────────────────────
 
 function getLogPath() {
-  const logDir = '/tmp/openclaw';
+  // OpenClaw puede escribir en /tmp/openclaw o /tmp/openclaw-<uid>
+  // Buscar el directorio correcto dinámicamente
+  const candidates = ['/tmp/openclaw-1000', '/tmp/openclaw'];
+  let logDir = candidates.find(d => {
+    try {
+      const files = fs.readdirSync(d);
+      return files.some(f => f.startsWith('openclaw-') && f.endsWith('.log'));
+    } catch { return false; }
+  }) || '/tmp/openclaw';
   const now    = new Date();
   const yyyy   = now.getFullYear();
   const mm     = String(now.getMonth() + 1).padStart(2, '0');
