@@ -58,23 +58,6 @@ function parseKV(msg) {
   return kv;
 }
 
-/**
- * Clasifica mensajes del subsistema agent/embedded.
- * El formato siempre es "embedded run <tipo>: key=val ..."
- * Se chequea en orden de más a menos específico.
- */
-function classifyEmbeddedRun(msg, kv) {
-  if (msg.includes('tool start'))   return { type: 'tool_start',   tool: kv.tool,    toolCallId: kv.toolCallId };
-  if (msg.includes('tool end'))     return { type: 'tool_end',     tool: kv.tool,    toolCallId: kv.toolCallId };
-  if (msg.includes('agent end'))    return { type: 'agent_end',    isError: kv.isError === 'true' };
-  if (msg.includes('prompt start')) return { type: 'prompt_start' };
-  if (msg.includes('prompt end'))   return { type: 'prompt_end',   durationMs: Number(kv.durationMs) || 0 };
-  if (msg.includes('agent start'))  return { type: 'agent_start'  };
-  if (msg.includes('run done'))     return { type: 'run_done',     durationMs: Number(kv.durationMs) || 0, aborted: kv.aborted === 'true' };
-  if (msg.includes('run start'))    return { type: 'run_start',    model: kv.model,  provider: kv.provider };
-  return { type: 'unknown' };
-}
-
 // ─── Mapeo de acciones a estaciones ──────────────────────────────────────────
 
 function mapActionToStation(action) {
@@ -108,17 +91,24 @@ function mapActionToStation(action) {
 /**
  * Convierte una línea JSON del log de OpenClaw en un entry estructurado.
  * Retorna null para líneas de ruido puro que no aportan valor al dashboard.
+ *
+ * Formato actual de OpenClaw (desde ~2026-03):
+ *   - NO existe más el subsystem agent/embedded
+ *   - Señales útiles: gateway/channels/*, gateway (model info), hooks/session-memory, [tools] errors
  */
 function mapLogEntry(raw) {
   let subsystem = '';
+  const raw0 = raw['0'] || '';
   try {
-    const parsed = JSON.parse(raw['0']);
+    const parsed = JSON.parse(raw0);
     subsystem = parsed.subsystem || '';
   } catch {
-    subsystem = raw['0'] || '';
+    // raw0 es texto plano — puede ser "[tools] ...", ANSI, etc.
+    subsystem = '';
   }
 
-  const msg  = raw['1'] || '';
+  // Mensaje: field '1' si hay subsystem, si no el raw0 es el mensaje
+  const msg  = subsystem ? String(raw['1'] || '') : String(raw0);
   const time = raw.time || raw._meta?.date || new Date().toISOString();
   const kv   = parseKV(msg);
 
@@ -127,109 +117,211 @@ function mapLogEntry(raw) {
   const toolCallId = kv.toolCallId || null;
 
   // ── Ruido puro → skip ────────────────────────────────────────────────────
-  if (subsystem === 'diagnostic') {
-    // Lane plumbing: no value para el dashboard
-    if (msg.includes('lane enqueue') ||
-        msg.includes('lane dequeue') ||
-        msg.includes('run registered') ||
-        msg.includes('run cleared') ||
-        msg.includes('lane task done') ||
-        msg.includes('update available')) return null;
-    return null; // todo lo diagnostic es ruido, filtrar
+  if (subsystem === 'diagnostic') return null;
+
+  // ── agent/embedded → errores y eventos de run ────────────────────────────
+  if (subsystem === 'agent/embedded') {
+    const kv2 = parseKV(msg);
+    // Solo capturar agent end con error (isError=true o error=terminated)
+    if (msg.includes('agent end') && (kv2.isError === 'true' || kv2.error)) {
+      return {
+        id:        logIdCounter++,
+        timestamp: time,
+        agentName: 'Star Platinum',
+        runId:     kv2.runId || null,
+        sessionId: null,
+        toolCallId: null,
+        action:    'error',
+        status:    'error',
+        subsystem,
+        details:   `✗ Agente terminado${kv2.error ? ` · ${kv2.error}` : ''}`,
+      };
+    }
+    // run_start
+    if (msg.includes('run start')) {
+      return {
+        id:        logIdCounter++,
+        timestamp: time,
+        agentName: 'Star Platinum',
+        runId:     kv2.runId || null,
+        sessionId: null,
+        toolCallId: null,
+        action:    'initializing',
+        status:    'running',
+        subsystem,
+        details:   `⭐ Run iniciado · ${kv2.model || '?'}`,
+      };
+    }
+    // tool_start
+    if (msg.includes('tool start') && kv2.tool) {
+      return {
+        id:        logIdCounter++,
+        timestamp: time,
+        agentName: 'Star Platinum',
+        runId:     kv2.runId || null,
+        sessionId: null,
+        toolCallId: kv2.toolCallId || null,
+        action:    kv2.tool,
+        status:    'running',
+        subsystem,
+        details:   `▶ ${kv2.tool} iniciado`,
+      };
+    }
+    // tool_end
+    if (msg.includes('tool end') && kv2.tool) {
+      return {
+        id:        logIdCounter++,
+        timestamp: time,
+        agentName: 'Star Platinum',
+        runId:     kv2.runId || null,
+        sessionId: null,
+        toolCallId: kv2.toolCallId || null,
+        action:    `${kv2.tool}_done`,
+        status:    'completed',
+        subsystem,
+        details:   `✓ ${kv2.tool} completado`,
+      };
+    }
+    // run_done
+    if (msg.includes('run done')) {
+      const aborted = kv2.aborted === 'true';
+      const dur = kv2.durationMs ? (Number(kv2.durationMs) / 1000).toFixed(1) : '?';
+      return {
+        id:        logIdCounter++,
+        timestamp: time,
+        agentName: 'Star Platinum',
+        runId:     kv2.runId || null,
+        sessionId: null,
+        toolCallId: null,
+        action:    aborted ? 'error' : 'completed',
+        status:    aborted ? 'error' : 'completed',
+        subsystem,
+        details:   aborted ? `✗ Abortado · ${dur}s` : `✓ Listo · ${dur}s`,
+      };
+    }
+    return null;
   }
 
-  // ── agent/embedded: lógica principal ────────────────────────────────────
-  if (subsystem === 'agent/embedded') {
-    const ev = classifyEmbeddedRun(msg, kv);
-
-    // Tipos que no aportan nada al dashboard
-    if (ev.type === 'agent_start' ||
-        ev.type === 'prompt_end'  ||
-        ev.type === 'unknown')          return null;
-
-    // agent_end sin error → run_done lo cubre
-    if (ev.type === 'agent_end' && !ev.isError) return null;
-
-    let action, status, details;
-
-    switch (ev.type) {
-      case 'run_start':
-        action  = 'initializing';
-        status  = 'running';
-        details = `Sesión iniciada · model: ${ev.model ?? '?'} · provider: ${ev.provider ?? '?'}`;
-        break;
-
-      case 'prompt_start':
-        action  = 'thinking';
-        status  = 'thinking';
-        details = '🤔 Procesando...';
-        break;
-
-      case 'tool_start':
-        action  = ev.tool || 'exec';
-        status  = 'running';
-        details = `▶ ${ev.tool ?? 'tool'} iniciado`;
-        break;
-
-      case 'tool_end':
-        action  = `${ev.tool || 'tool'}_done`;
-        status  = 'completed';
-        details = `✓ ${ev.tool ?? 'tool'} completado`;
-        break;
-
-      case 'agent_end': // isError === true
-        action  = 'error';
-        status  = 'error';
-        details = '✗ Error en la ejecución del agente';
-        break;
-
-      case 'run_done':
-        action  = ev.aborted ? 'error' : 'completed';
-        status  = ev.aborted ? 'error' : 'completed';
-        details = ev.aborted
-          ? `✗ Abortado tras ${(ev.durationMs / 1000).toFixed(1)}s`
-          : `✓ Listo · ${(ev.durationMs / 1000).toFixed(1)}s`;
-        break;
-
-      default:
-        return null;
+  // ── gateway principal → modelo del agente (startup) ──────────────────────
+  if (subsystem === 'gateway') {
+    // "agent model: github-copilot/claude-opus-4.6"
+    if (msg.includes('agent model:')) {
+      const model = msg.split('agent model:')[1]?.trim() || '?';
+      return {
+        id:        logIdCounter++,
+        timestamp: time,
+        agentName: 'Star Platinum',
+        runId:     'main',
+        sessionId: null,
+        toolCallId: null,
+        action:    'initializing',
+        status:    'running',
+        subsystem,
+        details:   `⭐ Gateway iniciado · ${model}`,
+      };
     }
+    return null;
+  }
 
-    // Nombre del agente: detectar sub-agentes por subsystem o sessionId
-    let agentName = 'Star Platinum';
-    if (subsystem.includes('subagent') || (sessionId && sessionId !== 'main'))
-      agentName = `Sub-Agent ${(runId || sessionId || '').slice(0, 6)}`;
-
+  // ── hooks/session-memory → actividad de memoria ──────────────────────────
+  if (subsystem === 'hooks/session-memory') {
+    if (!msg.includes('Session context saved')) return null;
+    const match = msg.match(/memory\/(.+)$/);
+    const file  = match ? match[1] : 'memoria';
     return {
-      id:          logIdCounter++,
-      timestamp:   time,
-      agentName,
-      runId,
-      sessionId,
-      toolCallId,
-      action,
-      status,
+      id:        logIdCounter++,
+      timestamp: time,
+      agentName: 'Star Platinum',
+      runId:     'main',
+      sessionId: null,
+      toolCallId: null,
+      action:    'memory',
+      status:    'completed',
       subsystem,
-      details,
+      details:   `🧠 Memoria guardada · ${file}`,
     };
   }
 
-  // ── gateway/channels → evento de comms ──────────────────────────────────
+  // ── [tools] texto plano → errores de herramientas ────────────────────────
+  if (subsystem === '' && msg.startsWith('[tools]') && msg.includes('failed')) {
+    const toolMatch = msg.match(/\[tools\]\s+(\w+)\s+failed:\s*(.+)/);
+    const tool   = toolMatch ? toolMatch[1] : 'tool';
+    const errMsg = toolMatch ? toolMatch[2].slice(0, 80) : msg.slice(0, 80);
+    return {
+      id:        logIdCounter++,
+      timestamp: time,
+      agentName: 'Star Platinum',
+      runId:     'main',
+      sessionId: null,
+      toolCallId: null,
+      action:    tool,
+      status:    'error',
+      subsystem: 'tools',
+      details:   `✗ ${tool}: ${errMsg}`,
+    };
+  }
+
+  // ── gateway/ws → send de mensaje al canal ────────────────────────────────
+  if (subsystem === 'gateway/ws') {
+    // "⇄ res ✓ send 414ms channel=telegram conn=... id=..."
+    if (msg.includes('res ✓ send') && msg.includes('channel=')) {
+      const chMatch  = msg.match(/channel=(\S+)/);
+      const durMatch = msg.match(/✓ send\s+(\d+)ms/);
+      const channel  = chMatch  ? chMatch[1]  : 'channel';
+      const dur      = durMatch ? durMatch[1] : '?';
+      return {
+        id:        logIdCounter++,
+        timestamp: time,
+        agentName: 'Star Platinum',
+        runId:     'main',
+        sessionId: null,
+        toolCallId: null,
+        action:    'message',
+        status:    'completed',
+        subsystem,
+        details:   `📨 Mensaje enviado · ${channel} · ${dur}ms`,
+      };
+    }
+    // "⇄ res ✓ agent.wait Nms" → agente procesando
+    if (msg.includes('res ✓ agent.wait')) {
+      const durMatch = msg.match(/agent\.wait\s+(\d+)ms/);
+      const dur      = durMatch ? durMatch[1] : '?';
+      return {
+        id:        logIdCounter++,
+        timestamp: time,
+        agentName: 'Star Platinum',
+        runId:     'main',
+        sessionId: null,
+        toolCallId: null,
+        action:    'thinking',
+        status:    'completed',
+        subsystem,
+        details:   `🤔 Respuesta generada · ${dur}ms`,
+      };
+    }
+    return null;
+  }
+
+  // ── gateway/channels → mensaje enviado (fallback) ─────────────────────────
   if (subsystem.startsWith('gateway/channels/')) {
-    const channel = subsystem.split('/').pop(); // 'telegram', 'discord', etc.
+    const channel = subsystem.split('/').pop();
     if (!msg.includes('sendMessage ok') && !msg.includes('send ok')) return null;
 
+    const chatMatch = msg.match(/chat=(\S+)/);
+    const msgMatch  = msg.match(/message=(\S+)/);
+    const msgId     = msgMatch ? msgMatch[1] : '';
+
     return {
-      id:          logIdCounter++,
-      timestamp:   time,
-      agentName:   'Star Platinum',
-      runId:       runId || 'main',
-      sessionId:   null,
-      toolCallId:  null,
-      action:      'message',
-      status:      'completed',
+      id:        logIdCounter++,
+      timestamp: time,
+      agentName: 'Star Platinum',
+      runId:     runId || 'main',
+      sessionId: null,
+      toolCallId: null,
+      action:    'message',
+      status:    'completed',
       subsystem,
-      details:     `📨 Mensaje enviado · ${channel}`,
+      details:   `📨 Mensaje enviado · ${channel}${msgId ? ` · #${msgId}` : ''}`,
     };
   }
 
@@ -421,8 +513,8 @@ function updateAgent(entry) {
     activeAgents[key].status   = entry.status;
     activeAgents[key].lastSeen = entry.timestamp;
   }
-  // Eviction: sin actividad hace más de 5 min
-  const cutoff = Date.now() - 5 * 60 * 1000;
+  // Eviction: sin actividad hace más de 30 min
+  const cutoff = Date.now() - 30 * 60 * 1000;
   for (const k of Object.keys(activeAgents)) {
     if (new Date(activeAgents[k].lastSeen).getTime() < cutoff)
       delete activeAgents[k];
